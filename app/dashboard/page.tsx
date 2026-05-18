@@ -104,11 +104,9 @@ export default async function DashboardPage() {
               {biomarkers.map(b => (
                 <HealthMetricCard
                   key={b.id}
-                  id={b.slug}
                   name={b.name}
                   value={b.value}
                   unit={b.unit}
-                  reference={b.reference}
                   status={b.status}
                   trend={b.trend}
                   category={b.category}
@@ -150,13 +148,10 @@ export default async function DashboardPage() {
               {reminders.map(r => (
                 <PreventiveReminderCard
                   key={r.id}
-                  id={r.id}
                   title={r.title}
                   description={r.description ?? ""}
-                  dueDate={r.due_date ?? ""}
-                  priority={r.priority}
-                  icon={r.icon}
                   daysUntil={r.due_date ? Math.ceil((new Date(r.due_date).getTime() - Date.now()) / 86400000) : 0}
+                  priority={r.priority}
                 />
               ))}
             </div>
@@ -167,7 +162,6 @@ export default async function DashboardPage() {
               {documents.slice(0, 4).map(d => (
                 <RecentDocumentCard
                   key={d.id}
-                  id={d.id}
                   title={d.title}
                   type={d.type}
                   date={d.date}

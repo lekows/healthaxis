@@ -28,7 +28,6 @@ export default async function TimelinePage() {
                 {yearEvents.map((event, i) => (
                   <TimelineEventCard
                     key={event.id}
-                    id={event.id}
                     date={event.date}
                     type={event.type}
                     title={event.title}
