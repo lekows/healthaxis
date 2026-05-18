@@ -1,0 +1,113 @@
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Card, Badge, Button } from "@/components/ui";
+import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
+import { getProfile, getMedications, getFamilyHistory } from "@/lib/supabase/queries";
+import { User, Pill, Users, Edit3 } from "lucide-react";
+
+export default async function ProfilePage() {
+  const [profile, medications, familyHistory] = await Promise.all([
+    getProfile(),
+    getMedications(),
+    getFamilyHistory(),
+  ]);
+
+  if (!profile) return null;
+
+  const initials = profile.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("");
+  const age = profile.dob
+    ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25 * 24 * 3600 * 1000))
+    : null;
+  const bmi = profile.height && profile.weight
+    ? (profile.weight / Math.pow(profile.height / 100, 2)).toFixed(1)
+    : null;
+
+  return (
+    <DashboardLayout userName={profile.name}>
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
+
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-ink">Perfil de Saúde</h1>
+            <p className="text-ink-muted text-sm mt-1">Informações pessoais e histórico de saúde.</p>
+          </div>
+          <Button variant="outline" size="sm"><Edit3 size={14} /> Editar</Button>
+        </div>
+
+        <Card className="p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-forest flex items-center justify-center">
+              <span className="text-2xl font-bold text-cream">{initials}</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-ink">{profile.name}</h2>
+              {age && <p className="text-ink-muted text-sm">{age} anos · {profile.dob}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: "Tipo sanguíneo", value: profile.blood ?? "—" },
+              { label: "Altura", value: profile.height ? `${profile.height} cm` : "—" },
+              { label: "Peso atual", value: profile.weight ? `${profile.weight} kg` : "—" },
+              { label: "IMC", value: bmi ?? "—" }
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-canvas-subtle rounded-2xl p-4">
+                <p className="text-xs text-ink-faint uppercase tracking-wide">{label}</p>
+                <p className="text-xl font-bold text-ink mt-1">{value}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {medications.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-ink-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Pill size={14} className="text-forest" /> Medicamentos em uso
+            </h2>
+            <div className="space-y-3">
+              {medications.map(m => (
+                <div key={m.id} className="flex items-center gap-4 p-4 rounded-2xl border border-border-soft bg-cream">
+                  <div className="w-9 h-9 rounded-xl bg-forest-pale flex items-center justify-center shrink-0">
+                    <Pill size={15} className="text-forest" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-ink">{m.name}</p>
+                    <p className="text-xs text-ink-faint mt-0.5">{m.dose} · {m.frequency}</p>
+                  </div>
+                  {m.prescribed && <Badge variant="success">Prescrito</Badge>}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-ink-faint mt-3">
+              ⚠️ Nunca altere, suspenda ou inicie medicamentos sem orientação médica.
+            </p>
+          </div>
+        )}
+
+        {familyHistory.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-ink-muted uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Users size={14} className="text-forest" /> Histórico familiar
+            </h2>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {familyHistory.map(fh => (
+                <div key={fh.id} className="flex items-start gap-3 p-4 rounded-2xl border border-border-soft bg-cream">
+                  <div className="w-2 h-2 rounded-full bg-terra mt-2 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{fh.condition}</p>
+                    <p className="text-xs text-ink-faint mt-0.5">{fh.relation} · início aos {fh.onset}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-ink-faint mt-3">
+              O histórico familiar é informativo e ajuda seu médico a contextualizar riscos. Não determina diagnóstico.
+            </p>
+          </div>
+        )}
+
+        <MedicalDisclaimer />
+      </div>
+    </DashboardLayout>
+  );
+}

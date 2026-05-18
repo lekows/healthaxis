@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=DM+Serif+Display:ital@0;1&display=swap');
+
+:root {
+  /* Dark theme */
+  --night: #0D0D0B;
+  --night-2: #141412;
+  --night-3: #1C1C19;
+  --night-4: #252520;
+  --ink-light: #E8E4D9;
+  --ink-dim: #9A9688;
+  --forest: #1B4332;
+  --forest-light: #52B788;
+  --forest-glow: rgba(82,183,136,0.12);
+  --terra: #C1440E;
+  --terra-glow: rgba(193,68,14,0.12);
+  --border-dark: rgba(255,255,255,0.07);
+  --border-dark-hover: rgba(255,255,255,0.13);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--night);
+  color: var(--ink-light);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--night-2); }
+::-webkit-scrollbar-thumb { background: #2D6A4F; border-radius: 4px; }
+
+/* Selection */
+::selection { background: rgba(82,183,136,0.25); color: #A7F3C0; }
+
+/* Editorial font */
+.font-editorial { font-family: 'DM Serif Display', Georgia, serif; }
+
+/* Gradient text — green */
+.text-gradient-green {
+  background: linear-gradient(135deg, #52B788 0%, #95E0B8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Gradient text — warm */
+.text-gradient-warm {
+  background: linear-gradient(135deg, #E8E4D9 0%, #52B788 60%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass dark */
+.glass-dark {
+  background: rgba(28, 28, 25, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-dark);
+}
+
+/* Noise texture overlay */
+.noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Glow orb */
+.glow-green {
+  background: radial-gradient(ellipse at center, rgba(82,183,136,0.18) 0%, transparent 70%);
+}
+.glow-terra {
+  background: radial-gradient(ellipse at center, rgba(193,68,14,0.15) 0%, transparent 70%);
+}
+
+/* Scroll reveal — starts hidden, JS adds .revealed */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.revealed {
+  opacity: 1;
+  transform: none;
+}
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+
+/* Marquee */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-track { animation: marquee 22s linear infinite; }
+.marquee-track:hover { animation-play-state: paused; }
+
+/* Shimmer on cards */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer-border {
+  background: linear-gradient(90deg, transparent 0%, rgba(82,183,136,0.4) 50%, transparent 100%);
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Floating blob */
+@keyframes float-blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 15px) scale(0.97); }
+}
+.blob-float { animation: float-blob 12s ease-in-out infinite; }
+.blob-float-slow { animation: float-blob 18s ease-in-out infinite reverse; }
+
+/* Pulse ring */
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.pulse-ring::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid #52B788;
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+/* Counter animation helper */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.count-up { animation: count-up 0.5s ease-out both; }
+
+/* Cursor glow (applied via JS) */
+.cursor-glow {
+  pointer-events: none;
+  position: fixed;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(82,183,136,0.06) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  transition: left 0.15s ease, top 0.15s ease;
+  z-index: 0;
+}
+
