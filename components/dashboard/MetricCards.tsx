@@ -124,6 +124,11 @@ export function BiomarkerTrendCard({ name, value, unit, status, history }: Bioma
   );
 }
 
+// ── MetricsGrid — wrapper genérico com className ──────
+export function MetricsGrid({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={className}>{children}</div>;
+}
+
 // ── BiomarkerGrid — staggered entry ───────────────────
 export function BiomarkerGrid({ children }: { children: React.ReactNode }) {
   return (
