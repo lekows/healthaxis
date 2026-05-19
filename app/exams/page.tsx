@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getBiomarkers, getBiomarkerHistory, getDocuments, getProfile } from "@/lib/supabase/queries";
-import { FlaskConical, Filter } from "lucide-react";
+import { FlaskConical, Filter, AlertTriangle } from "lucide-react";
 import { BiomarkerTrendCard } from "@/components/dashboard/MetricCards";
 
 export default async function ExamsPage() {
@@ -21,6 +21,11 @@ export default async function ExamsPage() {
 
   const categories = [...new Set(biomarkers.map(b => b.category))];
 
+  const anomalies = biomarkers.filter(b => b.status === "attention" || b.status === "risk" || b.status === "critical");
+
+  const statusLabel: Record<string, string> = { attention: "Atenção", risk: "Risco", critical: "Crítico" };
+  const statusVariant: Record<string, "warning" | "danger"> = { attention: "warning", risk: "danger", critical: "danger" };
+
   return (
     <DashboardLayout userName={profile?.name}>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
@@ -34,6 +39,31 @@ export default async function ExamsPage() {
             <Filter size={14} /> Filtrar
           </button>
         </div>
+
+        {anomalies.length > 0 && (
+          <div className="rounded-3xl p-5" style={{ background: "rgba(244,162,97,0.06)", border: "1px solid rgba(244,162,97,0.2)" }}>
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle size={15} style={{ color: "#F4A261" }} />
+              <p className="text-sm font-semibold" style={{ color: "#F4A261" }}>
+                {anomalies.length} marcador{anomalies.length > 1 ? "es" : ""} fora do parâmetro ideal
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {anomalies.map(b => (
+                <div key={b.id} className="flex items-center gap-2 px-3 py-2 rounded-2xl"
+                  style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <span className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{b.name}</span>
+                  <span className="text-sm font-bold" style={{ color: b.status === "risk" || b.status === "critical" ? "#C1440E" : "#F4A261" }}>
+                    {b.value} {b.unit}
+                  </span>
+                  <Badge variant={statusVariant[b.status] ?? "warning"}>
+                    {statusLabel[b.status] ?? b.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {categories.map(cat => {
           const items = biomarkers.filter(b => b.category === cat);

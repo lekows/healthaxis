@@ -1,8 +1,9 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, Badge, Button } from "@/components/ui";
+import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getDocuments, getProfile } from "@/lib/supabase/queries";
-import { FolderOpen, Upload, FileText, FlaskConical, Image as ImageIcon, CheckCircle, Clock } from "lucide-react";
+import { FolderOpen, FileText, FlaskConical, Image as ImageIcon, CheckCircle, Clock } from "lucide-react";
+import { UploadDocumentButton } from "@/components/documents/DocumentUploadModal";
 
 const typeIcon: Record<string, React.ElementType> = {
   "Exame Laboratorial": FlaskConical,
@@ -24,9 +25,7 @@ export default async function DocumentsPage() {
             <h1 className="text-2xl font-bold text-ink">Documentos</h1>
             <p className="text-ink-muted text-sm mt-1">{documents.length} arquivos · {reviewed} revisados</p>
           </div>
-          <Button variant="primary" className="gap-2">
-            <Upload size={14} /> Adicionar documento
-          </Button>
+          <UploadDocumentButton />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
