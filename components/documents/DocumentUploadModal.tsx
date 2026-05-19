@@ -87,9 +87,34 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
   const [entries, setEntries] = useState<EntryField[]>(
     CATALOG.map(c => ({ ...c, value: "", enabled: false }))
   );
+  const [extracting, setExtracting]         = useState(false);
+  const [extractedSlugs, setExtractedSlugs] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
+
+  const runExtraction = async (f: File) => {
+    setExtracting(true);
+    setExtractedSlugs(new Set());
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
+      if (!res.ok) return;
+      const data: { resultados: { slug: string; valor: number }[] } = await res.json();
+      const slugs = new Set<string>();
+      setEntries(prev => prev.map(e => {
+        const hit = data.resultados.find(r => r.slug === e.slug);
+        if (hit) { slugs.add(e.slug); return { ...e, enabled: true, value: String(hit.valor) }; }
+        return e;
+      }));
+      setExtractedSlugs(slugs);
+    } catch {
+      // falha silenciosa — usuário preenche manualmente
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const handleFileChange = (f: File | null) => {
     if (!f) return;
@@ -99,7 +124,9 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
     }
     setFile(f);
     setError(null);
+    setEntries(CATALOG.map(c => ({ ...c, value: "", enabled: false })));
     if (!title) setTitle(f.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
+    runExtraction(f);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -112,6 +139,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
 
   const handleNext = () => {
     if (!canProceedStep1) { setError("Preencha título, data e laboratório."); return; }
+    if (extracting) { setError("Aguarde — ainda extraindo os valores do arquivo."); return; }
     setError(null);
     if (docType === "Exame Laboratorial") setStep(2);
     else handleSave();
@@ -233,6 +261,21 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
                     <CheckCircle size={24} style={{ color: "#52B788" }} />
                     <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{file.name}</p>
                     <p className="text-xs" style={{ color: "#5A5A50" }}>{(file.size / 1024).toFixed(0)} KB</p>
+                    {extracting && (
+                      <p className="text-xs mt-1" style={{ color: "#F4A261" }}>
+                        Extraindo valores automaticamente…
+                      </p>
+                    )}
+                    {!extracting && extractedSlugs.size > 0 && (
+                      <p className="text-xs mt-1" style={{ color: "#52B788" }}>
+                        {extractedSlugs.size} campo{extractedSlugs.size > 1 ? "s" : ""} identificado{extractedSlugs.size > 1 ? "s" : ""}
+                      </p>
+                    )}
+                    {!extracting && extractedSlugs.size === 0 && (
+                      <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>
+                        Nenhum campo reconhecido — preencha manualmente no próximo passo
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-2">
@@ -293,8 +336,10 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
                 style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)" }}>
                 <FlaskConical size={14} className="mt-0.5 shrink-0" style={{ color: "#52B788" }} />
                 <p className="text-xs leading-relaxed" style={{ color: "#9A9688" }}>
-                  Marque os campos presentes no exame e insira os valores. Deixe em branco o que não constar.
-                  Esses dados atualizam os biomarcadores e alimentam os gráficos históricos.
+                  {extractedSlugs.size > 0
+                    ? `${extractedSlugs.size} campo${extractedSlugs.size > 1 ? "s foram" : " foi"} preenchido${extractedSlugs.size > 1 ? "s" : ""} automaticamente. Revise e corrija se necessário.`
+                    : "Marque os campos presentes no exame e insira os valores. Deixe em branco o que não constar."
+                  }
                 </p>
               </div>
 
@@ -318,9 +363,17 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
                             onChange={() => toggleEntry(entry.slug)}
                             className="w-3.5 h-3.5 rounded accent-green-500" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium" style={{ color: entry.enabled ? "#E8E4D9" : "#9A9688" }}>
-                              {entry.name}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-medium" style={{ color: entry.enabled ? "#E8E4D9" : "#9A9688" }}>
+                                {entry.name}
+                              </p>
+                              {extractedSlugs.has(entry.slug) && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-full"
+                                  style={{ background: "rgba(82,183,136,0.15)", color: "#52B788" }}>
+                                  auto
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs" style={{ color: "#5A5A50" }}>{entry.unit}</p>
                           </div>
                           {entry.enabled && (
