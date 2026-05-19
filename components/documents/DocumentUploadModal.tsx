@@ -131,8 +131,10 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
       let fileUrl: string | null = null;
       if (file) {
         const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
         const ext = file.name.split(".").pop() ?? "pdf";
-        const path = `${Date.now()}.${ext}`;
+        // path: {user_id}/{timestamp}.{ext} — necessário para as políticas RLS do bucket
+        const path = `${authUser?.id ?? "anon"}/${Date.now()}.${ext}`;
         const { data: up, error: upErr } = await supabase.storage
           .from("exam-files")
           .upload(path, file, { upsert: false });
