@@ -21,10 +21,10 @@ export default async function ExamsPage() {
 
   const categories = [...new Set(biomarkers.map(b => b.category))];
 
-  const anomalies = biomarkers.filter(b => b.status === "attention" || b.status === "risk" || b.status === "critical");
+  const anomalies = biomarkers.filter(b => b.status === "attention" || b.status === "high" || b.status === "low" || b.status === "critical");
 
-  const statusLabel: Record<string, string> = { attention: "Atenção", risk: "Risco", critical: "Crítico" };
-  const statusVariant: Record<string, "warning" | "danger"> = { attention: "warning", risk: "danger", critical: "danger" };
+  const statusLabel: Record<string, string> = { attention: "Atenção", high: "Elevado", low: "Baixo", critical: "Crítico" };
+  const statusVariant: Record<string, "warning" | "danger"> = { attention: "warning", high: "danger", low: "warning", critical: "danger" };
 
   return (
     <DashboardLayout userName={profile?.name}>
@@ -53,7 +53,7 @@ export default async function ExamsPage() {
                 <div key={b.id} className="flex items-center gap-2 px-3 py-2 rounded-2xl"
                   style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <span className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{b.name}</span>
-                  <span className="text-sm font-bold" style={{ color: b.status === "risk" || b.status === "critical" ? "#C1440E" : "#F4A261" }}>
+                  <span className="text-sm font-bold" style={{ color: b.status === "critical" || b.status === "high" ? "#C1440E" : "#F4A261" }}>
                     {b.value} {b.unit}
                   </span>
                   <Badge variant={statusVariant[b.status] ?? "warning"}>

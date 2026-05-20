@@ -6,70 +6,29 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { createDocument, saveExamBiomarkers } from "@/app/documents/actions";
+import type { OCRResultado } from "@/app/api/extract-exam/route";
 
-// Catálogo interno — só usado para enriquecer os slugs retornados pelo OCR
-const CATALOG = [
-  { slug: "ldl",          name: "LDL Colesterol",     category: "Lipídios",        unit: "mg/dL", ref: { min: 0, optimal: 100, borderline: 129, high: 160 } },
-  { slug: "hdl",          name: "HDL Colesterol",     category: "Lipídios",        unit: "mg/dL", ref: { optimal: 60, low: 40 } },
-  { slug: "triglycerides",name: "Triglicerídeos",     category: "Lipídios",        unit: "mg/dL", ref: { optimal: 150, borderline: 199, high: 499 } },
-  { slug: "total-chol",   name: "Colesterol Total",   category: "Lipídios",        unit: "mg/dL", ref: { optimal: 200, borderline: 239 } },
-  { slug: "glucose",      name: "Glicemia em Jejum",  category: "Glicemia",        unit: "mg/dL", ref: { optimal: 99, prediabetes: 125 } },
-  { slug: "hba1c",        name: "Hemoglobina Glicada",category: "Glicemia",        unit: "%",     ref: { optimal: 5.6, prediabetes: 6.4 } },
-  { slug: "tsh",          name: "TSH",                category: "Tireoide",        unit: "mUI/L", ref: { min: 0.4, max: 4.0 } },
-  { slug: "t4-livre",     name: "T4 Livre",           category: "Tireoide",        unit: "ng/dL", ref: { min: 0.8, max: 1.8 } },
-  { slug: "hemoglobin",   name: "Hemoglobina",        category: "Hemograma",       unit: "g/dL",  ref: { min: 12.0, max: 17.5 } },
-  { slug: "leukocytes",   name: "Leucócitos",         category: "Hemograma",       unit: "mil/mm³",ref: { min: 4.0, max: 11.0 } },
-  { slug: "platelets",    name: "Plaquetas",          category: "Hemograma",       unit: "mil/mm³",ref: { min: 150, max: 400 } },
-  { slug: "vitamin-d",    name: "Vitamina D",         category: "Vitaminas",       unit: "ng/mL", ref: { deficient: 20, insufficient: 30, optimal: 60 } },
-  { slug: "b12",          name: "Vitamina B12",       category: "Vitaminas",       unit: "pg/mL", ref: { min: 200, optimal_min: 300 } },
-  { slug: "ferritin",     name: "Ferritina",          category: "Vitaminas",       unit: "ng/mL", ref: { min: 15, optimal: 50 } },
-  { slug: "creatinine",   name: "Creatinina",         category: "Função Renal",    unit: "mg/dL", ref: { min: 0.6, max: 1.2 } },
-  { slug: "tgo",          name: "TGO (AST)",          category: "Função Hepática", unit: "U/L",   ref: { max: 40 } },
-  { slug: "tgp",          name: "TGP (ALT)",          category: "Função Hepática", unit: "U/L",   ref: { max: 40 } },
-] as const;
-
-type CatalogEntry = typeof CATALOG[number];
-
-const HIGH_IS_GOOD = new Set(["hdl", "vitamin-d", "b12", "ferritin", "hemoglobin"]);
-const RANGE_BASED  = new Set(["tsh", "t4-livre", "hemoglobin", "leukocytes", "platelets", "creatinine"]);
-
-// Retorna apenas valores aceitos pelo schema: optimal | attention | critical
-function inferStatus(slug: string, value: number, ref: Record<string, number>): "optimal" | "attention" | "critical" {
-  if (HIGH_IS_GOOD.has(slug)) {
-    const good = ref.optimal ?? ref.optimal_min ?? ref.min ?? 0;
-    const bad  = ref.low ?? ref.deficient ?? good * 0.6;
-    if (value < bad)  return "critical";
-    if (value < good) return "attention";
-    return "optimal";
+function inferStatus(
+  valor: number,
+  ref_min: number | null,
+  ref_max: number | null,
+  alterado: boolean
+): "optimal" | "attention" | "critical" {
+  if (!alterado) return "optimal";
+  if (ref_max !== null && valor > ref_max) {
+    return valor > ref_max * 1.5 ? "critical" : "attention";
   }
-  if (RANGE_BASED.has(slug) && "min" in ref && "max" in ref) {
-    if (value < ref.min * 0.75 || value > ref.max * 1.3) return "critical";
-    if (value < ref.min || value > ref.max)               return "attention";
-    return "optimal";
+  if (ref_min !== null && valor < ref_min) {
+    return valor < ref_min * 0.5 ? "critical" : "attention";
   }
-  if ("optimal" in ref) {
-    const borderline = ref.borderline ?? ref.prediabetes ?? ref.optimal * 1.3;
-    if (value <= ref.optimal)   return "optimal";
-    if (value <= borderline)    return "attention";
-    return "critical";
-  }
-  if ("max" in ref) {
-    if (value > ref.max * 1.3) return "critical";
-    if (value > ref.max)       return "attention";
-    return "optimal";
-  }
-  return "optimal";
-}
-
-function lookupMeta(slug: string): CatalogEntry | undefined {
-  return CATALOG.find(c => c.slug === slug);
+  return "attention";
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 interface ModalProps { onClose: () => void; }
 
 function DocumentUploadModalInner({ onClose }: ModalProps) {
-  const router      = useRouter();
+  const router       = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile]         = useState<File | null>(null);
@@ -143,10 +102,9 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
           const fd = new FormData();
           fd.append("file", file);
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
-          const data: { resultados: { slug: string; valor: number }[]; ocr_error?: string } = await res.json();
+          const data: { resultados: OCRResultado[]; ocr_error?: string } = await res.json();
 
           if (data.ocr_error) {
-            // OCR falhou — documento foi salvo, mas sem biomarcadores
             setError(`Documento salvo. Falha na extração automática: ${data.ocr_error}`);
             setLoading(false);
             router.refresh();
@@ -156,19 +114,18 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
           const resultados = data.resultados ?? [];
           if (resultados.length > 0) {
             const bioResult = await saveExamBiomarkers(
-              resultados.map(r => {
-                const meta = lookupMeta(r.slug);
-                const ref  = (meta?.ref ?? {}) as Record<string, number>;
-                return {
-                  slug:      r.slug,
-                  name:      meta?.name     ?? r.slug,
-                  category:  meta?.category ?? "Outros",
-                  unit:      meta?.unit     ?? "",
-                  value:     r.valor,
-                  reference: ref,
-                  status:    inferStatus(r.slug, r.valor, ref),
-                };
-              }),
+              resultados.map(r => ({
+                slug:      r.slug,
+                name:      r.nome,
+                category:  r.categoria ?? "Outros",
+                unit:      r.unidade   ?? "",
+                value:     r.valor,
+                reference: {
+                  ...(r.ref_min !== null ? { min: r.ref_min } : {}),
+                  ...(r.ref_max !== null ? { max: r.ref_max } : {}),
+                },
+                status: inferStatus(r.valor, r.ref_min, r.ref_max, r.alterado),
+              })),
               date
             );
             if (bioResult?.error) {
