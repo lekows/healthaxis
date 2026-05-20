@@ -29,7 +29,11 @@ export async function createDocument(data: {
       status:   "pending",
     });
 
-    if (error) return { error: error.message };
+    if (error) {
+      if (error.code === "23505")
+        return { error: "Exame duplicado — já existe um documento com este título, laboratório e data." };
+      return { error: error.message };
+    }
 
     revalidatePath("/documents");
     revalidatePath("/exams");
