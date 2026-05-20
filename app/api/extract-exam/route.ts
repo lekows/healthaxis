@@ -124,8 +124,8 @@ export async function POST(req: NextRequest) {
     const resultados = parseResponse(text);
     return NextResponse.json({ resultados });
   } catch (err) {
-    console.error("[extract-exam]", err);
-    // Falha silenciosa: retorna lista vazia → modal continua funcional no modo manual
-    return NextResponse.json({ resultados: [] });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[extract-exam]", msg);
+    return NextResponse.json({ resultados: [], ocr_error: msg });
   }
 }

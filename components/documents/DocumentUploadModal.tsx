@@ -143,30 +143,46 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
           const fd = new FormData();
           fd.append("file", file);
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
-          if (res.ok) {
-            const data: { resultados: { slug: string; valor: number }[] } = await res.json();
-            const resultados = data.resultados ?? [];
-            if (resultados.length > 0) {
-              await saveExamBiomarkers( // erros aqui são silenciosos — documento já salvo
-                resultados.map(r => {
-                  const meta = lookupMeta(r.slug);
-                  const ref  = (meta?.ref ?? {}) as Record<string, number>;
-                  return {
-                    slug:      r.slug,
-                    name:      meta?.name     ?? r.slug,
-                    category:  meta?.category ?? "Outros",
-                    unit:      meta?.unit     ?? "",
-                    value:     r.valor,
-                    reference: ref,
-                    status:    inferStatus(r.slug, r.valor, ref),
-                  };
-                }),
-                date
-              );
+          const data: { resultados: { slug: string; valor: number }[]; ocr_error?: string } = await res.json();
+
+          if (data.ocr_error) {
+            // OCR falhou — documento foi salvo, mas sem biomarcadores
+            setError(`Documento salvo. Falha na extração automática: ${data.ocr_error}`);
+            setLoading(false);
+            router.refresh();
+            return;
+          }
+
+          const resultados = data.resultados ?? [];
+          if (resultados.length > 0) {
+            const bioResult = await saveExamBiomarkers(
+              resultados.map(r => {
+                const meta = lookupMeta(r.slug);
+                const ref  = (meta?.ref ?? {}) as Record<string, number>;
+                return {
+                  slug:      r.slug,
+                  name:      meta?.name     ?? r.slug,
+                  category:  meta?.category ?? "Outros",
+                  unit:      meta?.unit     ?? "",
+                  value:     r.valor,
+                  reference: ref,
+                  status:    inferStatus(r.slug, r.valor, ref),
+                };
+              }),
+              date
+            );
+            if (bioResult?.error) {
+              setError(`Documento salvo. Erro ao registrar biomarcadores: ${bioResult.error}`);
+              setLoading(false);
+              router.refresh();
+              return;
             }
           }
-        } catch {
-          // OCR falhou silenciosamente — documento já foi salvo
+        } catch (ocrErr) {
+          setError(`Documento salvo. Erro na análise: ${ocrErr instanceof Error ? ocrErr.message : "tente novamente"}`);
+          setLoading(false);
+          router.refresh();
+          return;
         }
       }
 
