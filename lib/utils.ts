@@ -18,18 +18,22 @@ export function daysFromNow(dateStr: string): number {
 
 export function getBiomarkerColor(status: string): string {
   switch (status) {
-    case "optimal": return "#52B788";
+    case "optimal":   return "#52B788";
     case "attention": return "#F4A261";
-    case "risk": return "#C1440E";
-    default: return "#8A8A80";
+    case "critical":  return "#C1440E";
+    case "high":      return "#C1440E";
+    case "low":       return "#F4A261";
+    default:          return "#8A8A80";
   }
 }
 
 export function getBiomarkerLabel(status: string): string {
   switch (status) {
-    case "optimal": return "Ótimo";
+    case "optimal":   return "Ótimo";
     case "attention": return "Atenção";
-    case "risk": return "Risco";
-    default: return "Indefinido";
+    case "critical":  return "Crítico";
+    case "high":      return "Elevado";
+    case "low":       return "Baixo";
+    default:          return "Indefinido";
   }
 }

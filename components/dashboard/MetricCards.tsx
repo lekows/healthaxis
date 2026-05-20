@@ -16,7 +16,7 @@ export function HealthMetricCard({ name, value, unit, status, trend, lastDate, c
   const color = getBiomarkerColor(status);
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
   const variantMap: Record<string, "success" | "warning" | "danger" | "muted"> = {
-    optimal: "success", attention: "warning", risk: "danger"
+    optimal: "success", attention: "warning", risk: "danger", critical: "danger", high: "danger", low: "warning"
   };
   const barWidth = status === "optimal" ? 40 : status === "attention" ? 70 : 90;
 
@@ -85,7 +85,7 @@ interface BiomarkerTrendCardProps {
 export function BiomarkerTrendCard({ name, value, unit, status, history }: BiomarkerTrendCardProps) {
   const color = getBiomarkerColor(status);
   const variantMap: Record<string, "success" | "warning" | "danger" | "muted"> = {
-    optimal: "success", attention: "warning", risk: "danger"
+    optimal: "success", attention: "warning", risk: "danger", critical: "danger", high: "danger", low: "warning"
   };
 
   return (
