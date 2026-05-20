@@ -193,6 +193,50 @@ create policy "users can manage their own health score"
   on public.health_scores for all using (auth.uid() = user_id);
 
 -- =============================================
+-- STORAGE: arquivos de exames
+-- =============================================
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'exam-files',
+  'exam-files',
+  true,
+  8388608,
+  array['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "users can upload their own exam files"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'exam-files'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "users can read their own exam files"
+  on storage.objects for select
+  using (
+    bucket_id = 'exam-files'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "users can update their own exam files"
+  on storage.objects for update
+  using (
+    bucket_id = 'exam-files'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "users can delete their own exam files"
+  on storage.objects for delete
+  using (
+    bucket_id = 'exam-files'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- =============================================
 -- SEED: dados de exemplo para primeiro login
 -- (executar separado após criar o primeiro usuário)
 -- =============================================
