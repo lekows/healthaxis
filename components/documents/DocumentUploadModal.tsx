@@ -126,7 +126,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
       }
 
       // 2. Salva metadados do documento
-      await createDocument({
+      const docResult = await createDocument({
         title: title.trim(),
         type:  docType,
         lab:   lab.trim(),
@@ -134,6 +134,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
         tags:  tags.split(",").map(t => t.trim()).filter(Boolean),
         file_url: fileUrl,
       });
+      if (docResult?.error) { setError(docResult.error); return; }
 
       // 3. Extração automática via OCR (só para exames laboratoriais com arquivo)
       if (file && docType === "Exame Laboratorial") {
@@ -146,7 +147,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
             const data: { resultados: { slug: string; valor: number }[] } = await res.json();
             const resultados = data.resultados ?? [];
             if (resultados.length > 0) {
-              await saveExamBiomarkers(
+              await saveExamBiomarkers( // erros aqui são silenciosos — documento já salvo
                 resultados.map(r => {
                   const meta = lookupMeta(r.slug);
                   const ref  = (meta?.ref ?? {}) as Record<string, number>;
