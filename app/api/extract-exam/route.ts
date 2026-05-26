@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@/lib/supabase/server";
 
-const SYSTEM = `Você é um extrator de resultados de exames laboratoriais.
-Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
-Use ponto como separador decimal.`;
-
-const USER = `Extraia TODOS os resultados numéricos presentes neste exame laboratorial.
+const PROMPT = `Extraia TODOS os resultados numéricos presentes neste exame laboratorial.
 
 Para cada parâmetro encontrado, retorne:
 - slug: identificador em minúsculas com hífens (ex: "ldl-colesterol", "hemoglobina", "tsh", "vitamina-d")
@@ -19,6 +15,7 @@ Para cada parâmetro encontrado, retorne:
 - alterado: true se o valor está fora da faixa de referência, false se está dentro
 
 Inclua absolutamente todos os parâmetros com resultado numérico. Não omita nenhum.
+Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
 
 Resposta (apenas JSON):
 {"resultados":[{"slug":"ldl-colesterol","nome":"LDL Colesterol","valor":131,"unidade":"mg/dL","categoria":"Lipídios","ref_min":0,"ref_max":130,"alterado":true},{"slug":"hdl-colesterol","nome":"HDL Colesterol","valor":43,"unidade":"mg/dL","categoria":"Lipídios","ref_min":40,"ref_max":null,"alterado":false}]}`;
@@ -64,57 +61,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Arquivo muito grande (máx 8 MB)" }, { status: 413 });
   }
 
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ resultados: [], ocr_error: "GOOGLE_AI_API_KEY não configurada" });
+  }
+
   const bytes = await file.arrayBuffer();
   const base64 = Buffer.from(bytes).toString("base64");
-  const isPDF = file.type === "application/pdf";
 
-  const client = new Anthropic();
+  const mimeType = (
+    ["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)
+      ? file.type
+      : "image/jpeg"
+  ) as "application/pdf" | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
   try {
-    let text = "";
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    if (isPDF) {
-      const msg = await client.beta.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 4096,
-        betas: ["pdfs-2024-09-25"],
-        system: SYSTEM,
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: base64 }
-            },
-            { type: "text", text: USER }
-          ]
-        }]
-      });
-      const block = msg.content[0];
-      text = block.type === "text" ? block.text : "";
-    } else {
-      const mediaType = (
-        ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)
-          ? file.type
-          : "image/jpeg"
-      ) as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+    const result = await model.generateContent([
+      { inlineData: { mimeType, data: base64 } },
+      PROMPT,
+    ]);
 
-      const msg = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 4096,
-        system: SYSTEM,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-            { type: "text", text: USER }
-          ]
-        }]
-      });
-      const block = msg.content[0];
-      text = block.type === "text" ? block.text : "";
-    }
-
+    const text = result.response.text();
     const resultados = parseResponse(text);
     return NextResponse.json({ resultados });
   } catch (err) {
