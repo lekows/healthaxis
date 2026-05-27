@@ -132,7 +132,13 @@ async function main() {
 
   if (urlArg) {
     if (!jsonOnly) console.log(`\n🌐 Baixando PDF de: ${urlArg}`);
-    const res = await fetch(urlArg);
+    // Supabase Storage requer a chave anon para buckets com RLS
+    const headers = {};
+    if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      headers["apikey"] = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      headers["Authorization"] = `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`;
+    }
+    const res = await fetch(urlArg, { headers });
     if (!res.ok) {
       console.error(`❌ Falha ao baixar: ${res.status} ${res.statusText}`);
       process.exit(1);
