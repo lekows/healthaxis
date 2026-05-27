@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
+import pdfParse from "pdf-parse";
 
-const PROMPT = `Extraia TODOS os resultados numéricos presentes neste exame laboratorial.
+const PROMPT_BASE = `Extraia TODOS os resultados numéricos presentes neste exame laboratorial.
 
 Para cada parâmetro encontrado, retorne:
 - slug: identificador em minúsculas com hífens (ex: "ldl-colesterol", "hemoglobina", "tsh", "vitamina-d")
@@ -18,7 +19,7 @@ Inclua absolutamente todos os parâmetros com resultado numérico. Não omita ne
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
 
 Resposta (apenas JSON):
-{"resultados":[{"slug":"ldl-colesterol","nome":"LDL Colesterol","valor":131,"unidade":"mg/dL","categoria":"Lipídios","ref_min":0,"ref_max":130,"alterado":true},{"slug":"hdl-colesterol","nome":"HDL Colesterol","valor":43,"unidade":"mg/dL","categoria":"Lipídios","ref_min":40,"ref_max":null,"alterado":false}]}`;
+{"resultados":[{"slug":"ldl-colesterol","nome":"LDL Colesterol","valor":131,"unidade":"mg/dL","categoria":"Lipídios","ref_min":0,"ref_max":130,"alterado":true}]}`;
 
 export type OCRResultado = {
   slug: string;
@@ -48,6 +49,18 @@ function parseResponse(text: string): OCRResultado[] {
   }
 }
 
+// Tenta extrair texto de PDF. Retorna null se for escaneado (sem texto)
+async function extractPdfText(buffer: Buffer): Promise<string | null> {
+  try {
+    const data = await pdfParse(buffer);
+    const text = data.text?.trim() ?? "";
+    // PDF escaneado: quase nenhum texto selecionável
+    return text.length > 200 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -67,32 +80,66 @@ export async function POST(req: NextRequest) {
   }
 
   const bytes = await file.arrayBuffer();
-  const base64 = Buffer.from(bytes).toString("base64");
-
-  const mimeType = (
-    ["application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)
-      ? file.type
-      : "image/jpeg"
-  ) as "application/pdf" | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  const buffer = Buffer.from(bytes);
+  const isPDF = file.type === "application/pdf";
 
   try {
     const ai = new GoogleGenAI({ apiKey });
+    let responseText = "";
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [
-        {
+    if (isPDF) {
+      // Tenta extrair texto do PDF primeiro (muito mais barato e preciso)
+      const pdfText = await extractPdfText(buffer);
+
+      if (pdfText) {
+        // PDF digital com texto selecionável — envia só o texto, sem visão
+        console.log(`[extract-exam] PDF digital detectado (${pdfText.length} chars). Usando extração de texto.`);
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: [{
+            role: "user",
+            parts: [{ text: `${PROMPT_BASE}\n\n---\n\n${pdfText}` }],
+          }],
+        });
+        responseText = response.text ?? "";
+      } else {
+        // PDF escaneado — envia como documento para visão
+        console.log("[extract-exam] PDF escaneado detectado. Usando visão.");
+        const base64 = buffer.toString("base64");
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: [{
+            role: "user",
+            parts: [
+              { inlineData: { mimeType: "application/pdf", data: base64 } },
+              { text: PROMPT_BASE },
+            ],
+          }],
+        });
+        responseText = response.text ?? "";
+      }
+    } else {
+      // Imagem (JPG, PNG, WebP) — sempre usa visão
+      const base64 = buffer.toString("base64");
+      const mimeType = (
+        ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)
+          ? file.type : "image/jpeg"
+      ) as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [{
           role: "user",
           parts: [
             { inlineData: { mimeType, data: base64 } },
-            { text: PROMPT },
+            { text: PROMPT_BASE },
           ],
-        },
-      ],
-    });
+        }],
+      });
+      responseText = response.text ?? "";
+    }
 
-    const text = response.text ?? "";
-    const resultados = parseResponse(text);
+    const resultados = parseResponse(responseText);
     return NextResponse.json({ resultados });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
