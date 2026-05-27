@@ -105,18 +105,70 @@ function printTable(resultados) {
   console.log(line);
 }
 
+// ── Texto de exame de amostra (formato Sabin) ─────────────────────────────────
+const SAMPLE_EXAM = `
+SABIN MEDICINA DIAGNÓSTICA
+Paciente: João da Silva | Sexo: M | Idade: 75 anos
+Data de coleta: 21/03/2026 | Data de emissão: 22/03/2026
+
+=== LIPÍDIOS ===
+Colesterol Total         182    mg/dL    Referência: < 200
+LDL Colesterol           131    mg/dL    Referência: < 130  ** ALTERADO **
+HDL Colesterol            43    mg/dL    Referência: > 40
+Triglicerídeos           148    mg/dL    Referência: < 150
+VLDL                      30    mg/dL    Referência: < 30
+
+=== GLICEMIA ===
+Glicemia em Jejum         98    mg/dL    Referência: 70 - 99
+Hemoglobina Glicada      5.8    %        Referência: < 5.7  ** ALTERADO **
+
+=== HEMOGRAMA COMPLETO ===
+Hemoglobina             14.2    g/dL     Referência: 13.5 - 17.5
+Hematócrito             42.1    %        Referência: 41.0 - 53.0
+Leucócitos              6.800   /mm³     Referência: 4.000 - 11.000
+Plaquetas               210.000 /mm³     Referência: 150.000 - 400.000
+VCM                      88.4   fL       Referência: 80.0 - 100.0
+HCM                      29.8   pg       Referência: 27.0 - 33.0
+CHCM                     33.7   g/dL     Referência: 31.5 - 36.0
+
+=== FUNÇÃO RENAL ===
+Creatinina               1.10   mg/dL    Referência: 0.70 - 1.20
+Ureia                    38     mg/dL    Referência: 15 - 45
+Ácido Úrico              6.2    mg/dL    Referência: 3.5 - 7.2
+
+=== FUNÇÃO HEPÁTICA ===
+TGO (AST)                28     U/L      Referência: até 40
+TGP (ALT)                32     U/L      Referência: até 41
+Gama GT                  42     U/L      Referência: até 61
+Fosfatase Alcalina        87     U/L      Referência: 40 - 130
+Bilirrubina Total         0.8    mg/dL    Referência: 0.3 - 1.2
+
+=== TIREOIDE ===
+TSH                      2.45   mUI/L    Referência: 0.40 - 4.00
+T4 Livre                 1.12   ng/dL    Referência: 0.80 - 1.80
+
+=== VITAMINAS E MINERAIS ===
+Vitamina D (25-OH)        22.4   ng/mL    Referência: 30 - 100  ** ALTERADO **
+Vitamina B12             310     pg/mL    Referência: 200 - 900
+Ferritina                 68     ng/mL    Referência: 22 - 322
+Ferro Sérico              88     mcg/dL   Referência: 59 - 158
+`;
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
   const jsonOnly = args.includes("--json");
+  const useSample = args.includes("--sample");
   const urlIdx = args.indexOf("--url");
   const urlArg = urlIdx !== -1 ? args[urlIdx + 1] : null;
   const pdfPath = args.find(a => !a.startsWith("--") && a !== urlArg);
 
-  if (!urlArg && !pdfPath) {
+  if (!useSample && !urlArg && !pdfPath) {
     console.error("Uso:");
-    console.error("  node scripts/test-extract.mjs <caminho-do-pdf> [--json]");
-    console.error("  node scripts/test-extract.mjs --url <url-publica> [--json]");
+    console.error("  node scripts/test-extract.mjs --sample              (exame de amostra)");
+    console.error("  node scripts/test-extract.mjs <caminho-do-pdf>      (arquivo local)");
+    console.error("  node scripts/test-extract.mjs --url <url>           (URL pública)");
+    console.error("  Adicione --json para saída apenas em JSON");
     process.exit(1);
   }
 
@@ -132,7 +184,6 @@ async function main() {
 
   if (urlArg) {
     if (!jsonOnly) console.log(`\n🌐 Baixando PDF de: ${urlArg}`);
-    // Supabase Storage requer a chave anon para buckets com RLS
     const headers = {};
     if (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       headers["apikey"] = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -146,7 +197,7 @@ async function main() {
     const arrayBuf = await res.arrayBuffer();
     buffer = Buffer.from(arrayBuf);
     fileName = basename(new URL(urlArg).pathname) || "exame.pdf";
-  } else {
+  } else if (!useSample) {
     const absPath = resolve(pdfPath);
     if (!existsSync(absPath)) {
       console.error(`❌ Arquivo não encontrado: ${absPath}`);
@@ -154,6 +205,44 @@ async function main() {
     }
     buffer = readFileSync(absPath);
     fileName = basename(absPath);
+  }
+
+  const client = new Anthropic();
+  let responseText = "";
+
+  // Modo --sample: pula o PDF e usa o texto de amostra diretamente
+  if (useSample) {
+    if (!jsonOnly) console.log("\n🧪 Usando exame de amostra (Sabin — 22 parâmetros)");
+    if (!jsonOnly) console.log("🤖 Chamando Claude Haiku...\n");
+
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 4096,
+      system: SYSTEM,
+      messages: [{ role: "user", content: `${PROMPT}\n\n---\n\n${SAMPLE_EXAM}` }],
+    });
+    const block = msg.content[0];
+    responseText = block.type === "text" ? block.text : "";
+
+    if (!jsonOnly) {
+      const usage = msg.usage;
+      console.log(`💰 Tokens: ${usage.input_tokens} entrada + ${usage.output_tokens} saída`);
+      const cost = ((usage.input_tokens * 1 + usage.output_tokens * 5) / 1_000_000).toFixed(5);
+      console.log(`   Custo estimado: US$ ${cost}\n`);
+    }
+
+    const resultados = parseResponse(responseText);
+    if (jsonOnly) { console.log(JSON.stringify({ resultados }, null, 2)); return; }
+    if (resultados.length === 0) { console.log("⚠️  Nenhum parâmetro extraído.\n" + responseText); return; }
+    printTable(resultados);
+    const alterados = resultados.filter(r => r.alterado).length;
+    console.log(`\n📊 Total: ${resultados.length} parâmetros | ${alterados} alterados\n`);
+    const outputDir = new URL("./output", import.meta.url).pathname;
+    mkdirSync(outputDir, { recursive: true });
+    const outFile = `${outputDir}/sample-${Date.now()}.json`;
+    writeFileSync(outFile, JSON.stringify({ resultados }, null, 2), "utf8");
+    console.log(`📋 JSON salvo em: scripts/output/${basename(outFile)}\n`);
+    return;
   }
 
   const fileSizeKB = (buffer.length / 1024).toFixed(0);
@@ -167,9 +256,6 @@ async function main() {
     const text = data.text?.trim() ?? "";
     if (text.length > 200) pdfText = text;
   } catch { /* PDF pode estar criptografado ou corrompido */ }
-
-  const client = new Anthropic();
-  let responseText = "";
 
   if (pdfText) {
     if (!jsonOnly) console.log(`✅ PDF digital detectado — extraindo texto (${pdfText.length} chars)`);
