@@ -108,17 +108,15 @@ function printTable(resultados) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   const args = process.argv.slice(2);
-  const pdfPath = args.find(a => !a.startsWith("--"));
   const jsonOnly = args.includes("--json");
+  const urlIdx = args.indexOf("--url");
+  const urlArg = urlIdx !== -1 ? args[urlIdx + 1] : null;
+  const pdfPath = args.find(a => !a.startsWith("--") && a !== urlArg);
 
-  if (!pdfPath) {
-    console.error("Uso: node scripts/test-extract.mjs <caminho-do-pdf> [--json]");
-    process.exit(1);
-  }
-
-  const absPath = resolve(pdfPath);
-  if (!existsSync(absPath)) {
-    console.error(`❌ Arquivo não encontrado: ${absPath}`);
+  if (!urlArg && !pdfPath) {
+    console.error("Uso:");
+    console.error("  node scripts/test-extract.mjs <caminho-do-pdf> [--json]");
+    console.error("  node scripts/test-extract.mjs --url <url-publica> [--json]");
     process.exit(1);
   }
 
@@ -129,8 +127,29 @@ async function main() {
     process.exit(1);
   }
 
-  const buffer = readFileSync(absPath);
-  const fileName = basename(absPath);
+  let buffer;
+  let fileName;
+
+  if (urlArg) {
+    if (!jsonOnly) console.log(`\n🌐 Baixando PDF de: ${urlArg}`);
+    const res = await fetch(urlArg);
+    if (!res.ok) {
+      console.error(`❌ Falha ao baixar: ${res.status} ${res.statusText}`);
+      process.exit(1);
+    }
+    const arrayBuf = await res.arrayBuffer();
+    buffer = Buffer.from(arrayBuf);
+    fileName = basename(new URL(urlArg).pathname) || "exame.pdf";
+  } else {
+    const absPath = resolve(pdfPath);
+    if (!existsSync(absPath)) {
+      console.error(`❌ Arquivo não encontrado: ${absPath}`);
+      process.exit(1);
+    }
+    buffer = readFileSync(absPath);
+    fileName = basename(absPath);
+  }
+
   const fileSizeKB = (buffer.length / 1024).toFixed(0);
 
   if (!jsonOnly) console.log(`\n📄 PDF: ${fileName} (${fileSizeKB} KB)`);
