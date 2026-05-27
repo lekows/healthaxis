@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 
 const PROMPT = `Extraia TODOS os resultados numéricos presentes neste exame laboratorial.
@@ -76,15 +76,22 @@ export async function POST(req: NextRequest) {
   ) as "application/pdf" | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const ai = new GoogleGenAI({ apiKey });
 
-    const result = await model.generateContent([
-      { inlineData: { mimeType, data: base64 } },
-      PROMPT,
-    ]);
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: base64 } },
+            { text: PROMPT },
+          ],
+        },
+      ],
+    });
 
-    const text = result.response.text();
+    const text = response.text ?? "";
     const resultados = parseResponse(text);
     return NextResponse.json({ resultados });
   } catch (err) {
