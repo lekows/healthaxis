@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import pdfParse from "pdf-parse";
+
+const SYSTEM = `Você é um extrator de resultados de exames laboratoriais.
+Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
+Use ponto como separador decimal.`;
 
 const PROMPT_BASE = `Extraia TODOS os resultados numéricos presentes neste exame laboratorial.
 
@@ -49,12 +53,10 @@ function parseResponse(text: string): OCRResultado[] {
   }
 }
 
-// Tenta extrair texto de PDF. Retorna null se for escaneado (sem texto)
 async function extractPdfText(buffer: Buffer): Promise<string | null> {
   try {
     const data = await pdfParse(buffer);
     const text = data.text?.trim() ?? "";
-    // PDF escaneado: quase nenhum texto selecionável
     return text.length > 200 ? text : null;
   } catch {
     return null;
@@ -74,69 +76,74 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Arquivo muito grande (máx 8 MB)" }, { status: 413 });
   }
 
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ resultados: [], ocr_error: "GOOGLE_AI_API_KEY não configurada" });
-  }
-
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
   const isPDF = file.type === "application/pdf";
+  const client = new Anthropic();
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
     let responseText = "";
 
     if (isPDF) {
-      // Tenta extrair texto do PDF primeiro (muito mais barato e preciso)
+      // Tenta extrair texto do PDF primeiro (muito mais barato)
       const pdfText = await extractPdfText(buffer);
 
       if (pdfText) {
-        // PDF digital com texto selecionável — envia só o texto, sem visão
-        console.log(`[extract-exam] PDF digital detectado (${pdfText.length} chars). Usando extração de texto.`);
-        const response = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
-          contents: [{
+        // PDF digital com texto selecionável — envia só o texto
+        console.log(`[extract-exam] PDF digital (${pdfText.length} chars). Usando texto.`);
+        const msg = await client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 4096,
+          system: SYSTEM,
+          messages: [{
             role: "user",
-            parts: [{ text: `${PROMPT_BASE}\n\n---\n\n${pdfText}` }],
+            content: `${PROMPT_BASE}\n\n---\n\n${pdfText}`,
           }],
         });
-        responseText = response.text ?? "";
+        const block = msg.content[0];
+        responseText = block.type === "text" ? block.text : "";
       } else {
-        // PDF escaneado — envia como documento para visão
-        console.log("[extract-exam] PDF escaneado detectado. Usando visão.");
+        // PDF escaneado — envia como documento via beta
+        console.log("[extract-exam] PDF escaneado. Usando visão.");
         const base64 = buffer.toString("base64");
-        const response = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
-          contents: [{
+        const msg = await client.beta.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 4096,
+          betas: ["pdfs-2024-09-25"],
+          system: SYSTEM,
+          messages: [{
             role: "user",
-            parts: [
-              { inlineData: { mimeType: "application/pdf", data: base64 } },
-              { text: PROMPT_BASE },
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+              { type: "text", text: PROMPT_BASE },
             ],
           }],
         });
-        responseText = response.text ?? "";
+        const block = msg.content[0];
+        responseText = block.type === "text" ? block.text : "";
       }
     } else {
-      // Imagem (JPG, PNG, WebP) — sempre usa visão
+      // Imagem (JPG, PNG, WebP)
       const base64 = buffer.toString("base64");
-      const mimeType = (
+      const mediaType = (
         ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)
           ? file.type : "image/jpeg"
       ) as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: [{
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 4096,
+        system: SYSTEM,
+        messages: [{
           role: "user",
-          parts: [
-            { inlineData: { mimeType, data: base64 } },
-            { text: PROMPT_BASE },
+          content: [
+            { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+            { type: "text", text: PROMPT_BASE },
           ],
         }],
       });
-      responseText = response.text ?? "";
+      const block = msg.content[0];
+      responseText = block.type === "text" ? block.text : "";
     }
 
     const resultados = parseResponse(responseText);
