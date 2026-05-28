@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import pdfParse from "pdf-parse";
+import { createRequire } from "module";
+
+const _require = createRequire(import.meta.url);
+const pdfParse = _require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
 
 const SYSTEM = `Você é um extrator de resultados de exames laboratoriais.
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
