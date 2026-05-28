@@ -240,3 +240,24 @@ create policy "users can delete their own exam files"
 -- SEED: dados de exemplo para primeiro login
 -- (executar separado após criar o primeiro usuário)
 -- =============================================
+
+-- =============================================
+-- GRANTS — permissões explícitas para a API
+-- Obrigatório a partir de 30 mai 2026 (novos projetos)
+-- =============================================
+grant usage on schema public to anon, authenticated, service_role;
+
+grant all privileges on all tables    in schema public to anon, authenticated, service_role;
+grant all privileges on all functions in schema public to anon, authenticated, service_role;
+grant all privileges on all sequences in schema public to anon, authenticated, service_role;
+
+-- Garante que tabelas criadas futuramente também tenham acesso automático
+alter default privileges in schema public
+  grant all on tables    to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant all on functions to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+
