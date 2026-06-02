@@ -117,28 +117,33 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Tendências */}
-        {Object.keys(historyBySlug).length > 0 && (
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Tendências — últimos 7 meses</h2>
-            <MetricsGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {["ldl", "hdl", "glucose", "weight"].filter(slug => historyBySlug[slug]).map(slug => {
-                const bm = biomarkers.find(b => b.slug === slug);
-                if (!bm) return null;
-                return (
+        {/* Tendências — mostra os mais relevantes (alterados primeiro) */}
+        {Object.keys(historyBySlug).length > 0 && (() => {
+          const statusOrder: Record<string, number> = { critical: 0, high: 1, low: 1, attention: 2, optimal: 3 };
+          const trendBiomarkers = biomarkers
+            .filter(bm => historyBySlug[bm.slug]?.length > 0)
+            .sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4))
+            .slice(0, 4);
+          if (!trendBiomarkers.length) return null;
+          return (
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Tendências</h2>
+              <MetricsGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {trendBiomarkers.map(bm => (
                   <BiomarkerTrendCard
-                    key={slug}
+                    key={bm.slug}
                     name={bm.name}
                     value={Number(bm.value)}
                     unit={bm.unit}
                     status={bm.status}
-                    history={historyBySlug[slug].map(h => ({ date: h.date_label, value: h.value }))}
+                    history={historyBySlug[bm.slug].map(h => ({ date: h.date_label, value: h.value }))}
+                    reference={bm.reference as Record<string, number>}
                   />
-                );
-              })}
-            </MetricsGrid>
-          </div>
-        )}
+                ))}
+              </MetricsGrid>
+            </div>
+          );
+        })()}
 
         {/* Bottom grid */}
         <div className="grid lg:grid-cols-3 gap-6">

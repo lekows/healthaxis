@@ -76,7 +76,7 @@ export default async function ExamsPage() {
                 {items.map(b => {
                   const hist = historyBySlug[b.slug];
                   if (hist?.length) {
-                    return <BiomarkerTrendCard key={b.id} name={b.name} value={Number(b.value)} unit={b.unit} status={b.status} history={hist} />;
+                    return <BiomarkerTrendCard key={b.id} name={b.name} value={Number(b.value)} unit={b.unit} status={b.status} history={hist} reference={b.reference as Record<string, number>} />;
                   }
                   return (
                     <Card key={b.id} className="p-5">
