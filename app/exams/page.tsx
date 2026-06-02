@@ -5,6 +5,7 @@ import { getBiomarkers, getBiomarkerHistory, getDocuments, getProfile } from "@/
 import { FlaskConical, Filter, AlertTriangle } from "lucide-react";
 import { BiomarkerTrendCard } from "@/components/dashboard/MetricCards";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ManualBiomarkerModal } from "@/components/exams/ManualBiomarkerModal";
 
 export default async function ExamsPage() {
   const [profile, biomarkers, history, documents] = await Promise.all([
@@ -36,9 +37,7 @@ export default async function ExamsPage() {
             <h1 className="text-2xl font-bold text-ink">Exames</h1>
             <p className="text-ink-muted text-sm mt-1">Resultados laboratoriais e biomarcadores registrados.</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-2xl border border-border-soft text-sm text-ink-muted hover:bg-canvas-subtle transition-all">
-            <Filter size={14} /> Filtrar
-          </button>
+          <ManualBiomarkerModal />
         </div>
 
         {anomalies.length > 0 && (
