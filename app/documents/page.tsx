@@ -3,6 +3,7 @@ import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getDocuments, getProfile } from "@/lib/supabase/queries";
 import { FolderOpen, FileText, FlaskConical, Image as ImageIcon, CheckCircle, Clock } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { UploadDocumentButton } from "@/components/documents/DocumentUploadModal";
 
 const typeIcon: Record<string, React.ElementType> = {
@@ -41,6 +42,15 @@ export default async function DocumentsPage() {
             </Card>
           ))}
         </div>
+
+        {documents.length === 0 && (
+          <EmptyState
+            icon={FolderOpen}
+            title="Nenhum documento ainda"
+            description="Faça upload de laudos, exames ou imagens médicas para começar a organizar seu histórico de saúde."
+            action={{ label: "Enviar primeiro documento", href: "#" }}
+          />
+        )}
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {documents.map(doc => {

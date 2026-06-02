@@ -4,6 +4,7 @@ import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getBiomarkers, getBiomarkerHistory, getDocuments, getProfile } from "@/lib/supabase/queries";
 import { FlaskConical, Filter, AlertTriangle } from "lucide-react";
 import { BiomarkerTrendCard } from "@/components/dashboard/MetricCards";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default async function ExamsPage() {
   const [profile, biomarkers, history, documents] = await Promise.all([
@@ -63,6 +64,15 @@ export default async function ExamsPage() {
               ))}
             </div>
           </div>
+        )}
+
+        {biomarkers.length === 0 && (
+          <EmptyState
+            icon={FlaskConical}
+            title="Nenhum biomarcador registrado"
+            description="Envie um laudo laboratorial para extrair e visualizar seus resultados automaticamente."
+            action={{ label: "Enviar laudo", href: "/documents" }}
+          />
         )}
 
         {categories.map(cat => {

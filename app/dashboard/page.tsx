@@ -4,7 +4,8 @@ import { HealthMetricCard, BiomarkerTrendCard, MetricsGrid } from "@/components/
 import { PreventiveReminderCard, RiskAreaCard, RecentDocumentCard } from "@/components/dashboard/EventCards";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore } from "@/lib/supabase/queries";
-import { Activity, TrendingUp, FileText, Bell, ArrowRight } from "lucide-react";
+import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default async function DashboardPage() {
   const [profile, biomarkers, history, documents, reminders, healthScore] = await Promise.all([
@@ -97,6 +98,14 @@ export default async function DashboardPage() {
         </div>
 
         {/* Biomarcadores */}
+        {biomarkers.length === 0 && (
+          <EmptyState
+            icon={FlaskConical}
+            title="Nenhum exame registrado ainda"
+            description="Envie seu primeiro laudo laboratorial para começar a monitorar seus biomarcadores."
+            action={{ label: "Enviar primeiro exame", href: "/documents" }}
+          />
+        )}
         {biomarkers.length > 0 && (
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Biomarcadores principais</h2>
