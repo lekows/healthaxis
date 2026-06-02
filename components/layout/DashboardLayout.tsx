@@ -127,17 +127,6 @@ export function DashboardLayout({ children, userName = "Usuário" }: { children:
             </div>
             <span className="font-semibold text-sm" style={{ color: "#E8E4D9" }}>HealthAxis</span>
           </Link>
-          <div className="flex gap-1 overflow-x-auto">
-            {navItems.slice(0, 4).map(({ href, icon: Icon }) => {
-              const active = pathname === href;
-              return (
-                <Link key={href} href={href} className="p-2 rounded-xl transition-all"
-                  style={{ background: active ? "rgba(82,183,136,0.12)" : "transparent", color: active ? "#52B788" : "#9A9688" }}>
-                  <Icon size={16} />
-                </Link>
-              );
-            })}
-          </div>
         </motion.header>
 
         {/* Page transition */}
@@ -148,11 +137,42 @@ export function DashboardLayout({ children, userName = "Usuário" }: { children:
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.35, ease: ease.out }}
-            className="min-h-screen"
+            className="min-h-screen lg:pb-0 pb-20"
           >
             {children}
           </motion.main>
         </AnimatePresence>
+
+        {/* Bottom navigation — mobile only */}
+        <nav
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around px-2 py-2"
+          style={{ background: "rgba(13,13,11,0.92)", backdropFilter: "blur(16px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          {[
+            { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
+            { href: "/exams", icon: FlaskConical, label: "Exames" },
+            { href: "/documents", icon: FolderOpen, label: "Documentos" },
+            { href: "/timeline", icon: Clock, label: "Histórico" },
+            { href: "/profile", icon: User, label: "Perfil" },
+          ].map(({ href, icon: Icon, label }) => {
+            const active = pathname === href;
+            return (
+              <Link key={href} href={href} className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors"
+                style={{ color: active ? "#52B788" : "#5A5A50" }}>
+                {active && (
+                  <motion.div
+                    layoutId="bottom-nav-active"
+                    className="absolute inset-0 rounded-2xl"
+                    style={{ background: "rgba(82,183,136,0.1)" }}
+                    transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                  />
+                )}
+                <Icon size={18} className="relative z-10" />
+                <span className="text-xs font-medium relative z-10">{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </div>
   );
