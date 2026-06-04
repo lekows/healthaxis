@@ -25,7 +25,9 @@ Para cada parâmetro encontrado, retorne:
 Inclua absolutamente todos os parâmetros com resultado numérico. Não omita nenhum.
 
 Além dos resultados, extraia também (se presentes no documento):
-- medico_solicitante: { nome: string, crm: string, crm_uf: string } — médico que assinou/solicitou o exame (null se não encontrado)
+- medico_solicitante: { nome: string, crm: string | null, crm_uf: string | null }
+  IMPORTANTE: extrair o médico SOLICITANTE (quem pediu o exame ao paciente), NÃO o responsável técnico do laboratório.
+  crm e crm_uf podem ser null se não encontrados no documento.
 - laboratorio: { nome: string } — nome do laboratório (null se não encontrado)
 - data_exame: data do exame no formato "YYYY-MM-DD" (null se não encontrada)
 
@@ -45,7 +47,7 @@ export type OCRResultado = {
   alterado: boolean;
 };
 
-export type OCRMedico = { nome: string; crm: string; crm_uf: string };
+export type OCRMedico = { nome: string; crm: string | null; crm_uf: string | null };
 
 export type OCRExamData = {
   resultados: OCRResultado[];
@@ -68,8 +70,8 @@ function parseResponse(text: string): OCRExamData {
         typeof (r as OCRResultado).valor === "number"
     );
     const med = parsed.medico_solicitante;
-    const medico = (med && typeof med.nome === "string" && typeof med.crm === "string")
-      ? { nome: med.nome, crm: med.crm, crm_uf: med.crm_uf ?? "" }
+    const medico = (med && typeof med.nome === "string" && med.nome.trim())
+      ? { nome: med.nome.trim(), crm: med.crm ?? null, crm_uf: med.crm_uf ?? null }
       : null;
     const lab = parsed.laboratorio?.nome ? { nome: parsed.laboratorio.nome } : null;
     const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;

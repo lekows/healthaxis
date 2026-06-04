@@ -111,12 +111,12 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
             return;
           }
 
-          // Salva médico solicitante se encontrado
-          if (data.medico_solicitante?.crm) {
+          // Salva médico solicitante se encontrado (CRM é opcional)
+          if (data.medico_solicitante?.nome) {
             await saveDoctor({
               name: data.medico_solicitante.nome,
-              crm: data.medico_solicitante.crm,
-              crm_uf: data.medico_solicitante.crm_uf ?? "",
+              crm: data.medico_solicitante.crm ?? null,
+              crm_uf: data.medico_solicitante.crm_uf ?? null,
               examDate: data.data_exame ?? date,
             });
           }

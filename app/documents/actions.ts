@@ -100,8 +100,8 @@ export async function saveExamBiomarkers(
 
 export async function saveDoctor(data: {
   name: string;
-  crm: string;
-  crm_uf: string;
+  crm: string | null;
+  crm_uf: string | null;
   examDate: string;
 }): Promise<ActionResult> {
   try {
@@ -109,13 +109,13 @@ export async function saveDoctor(data: {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Sessão expirada." };
 
-    const existing = await supabase
-      .from("doctors")
-      .select("id, exam_count, first_exam_date")
-      .eq("user_id", user.id)
-      .eq("crm", data.crm)
-      .eq("crm_uf", data.crm_uf)
-      .maybeSingle();
+    const hasCrm = !!(data.crm && data.crm.trim());
+
+    const existingQuery = hasCrm
+      ? supabase.from("doctors").select("id, exam_count").eq("user_id", user.id).eq("crm", data.crm!).eq("crm_uf", data.crm_uf ?? "")
+      : supabase.from("doctors").select("id, exam_count").eq("user_id", user.id).ilike("name", data.name);
+
+    const existing = await existingQuery.maybeSingle();
 
     if (existing.data) {
       await supabase.from("doctors").update({
@@ -127,8 +127,8 @@ export async function saveDoctor(data: {
       await supabase.from("doctors").insert({
         user_id: user.id,
         name: data.name,
-        crm: data.crm,
-        crm_uf: data.crm_uf,
+        crm: hasCrm ? data.crm : null,
+        crm_uf: hasCrm ? (data.crm_uf ?? null) : null,
         first_exam_date: data.examDate,
         last_exam_date: data.examDate,
         exam_count: 1,

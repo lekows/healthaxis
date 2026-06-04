@@ -63,8 +63,10 @@ export default async function DoctorsPage() {
                       <div>
                         <p className="text-base font-semibold" style={{ color: "#E8E4D9" }}>{doc.name}</p>
                         <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>
-                          CRM {doc.crm}{doc.crm_uf ? `/${doc.crm_uf}` : ""}
-                          {doc.specialty && ` · ${doc.specialty}`}
+                          {doc.crm
+                            ? <>CRM {doc.crm}{doc.crm_uf ? `/${doc.crm_uf}` : ""}{doc.specialty ? ` · ${doc.specialty}` : ""}</>
+                            : <span style={{ color: "#5A5A50" }}>CRM não encontrado{doc.specialty ? ` · ${doc.specialty}` : ""}</span>
+                          }
                         </p>
                       </div>
 
