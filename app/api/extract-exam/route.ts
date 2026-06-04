@@ -132,15 +132,16 @@ export async function POST(req: NextRequest) {
       const pdfText = await extractPdfText(buffer);
 
       if (pdfText) {
-        // PDF digital com texto selecionável — envia só o texto
-        console.log(`[extract-exam] PDF digital (${pdfText.length} chars). Usando texto.`);
+        // PDF digital com texto selecionável — envia só o texto (limitado para caber no rate limit)
+        const truncated = pdfText.length > 12000 ? pdfText.substring(0, 12000) : pdfText;
+        console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 8192,
           system: SYSTEM,
           messages: [{
             role: "user",
-            content: `${PROMPT_BASE}\n\n---\n\n${pdfText}`,
+            content: `${PROMPT_BASE}\n\n---\n\n${truncated}`,
           }],
         });
         const block = msg.content[0];
@@ -194,8 +195,12 @@ export async function POST(req: NextRequest) {
     console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
     return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 4000) });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[extract-exam]", msg);
+    const raw = err instanceof Error ? err.message : String(err);
+    console.error("[extract-exam]", raw);
+    const isRateLimit = raw.includes("rate_limit") || raw.includes("429");
+    const msg = isRateLimit
+      ? "Limite de requisições atingido. Aguarde 1 minuto e tente novamente."
+      : raw;
     return NextResponse.json({ resultados: [], ocr_error: msg });
   }
 }
