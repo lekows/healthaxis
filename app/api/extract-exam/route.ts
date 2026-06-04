@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars). Usando texto.`);
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 4096,
+          max_tokens: 8192,
           system: SYSTEM,
           messages: [{
             role: "user",
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
         const base64 = buffer.toString("base64");
         const msg = await client.beta.messages.create({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 4096,
+          max_tokens: 8192,
           betas: ["pdfs-2024-09-25"],
           system: SYSTEM,
           messages: [{
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
 
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: SYSTEM,
         messages: [{
           role: "user",
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
     console.log("[extract-exam] responseText (primeiros 800 chars):", responseText.substring(0, 800));
     const examData = parseResponse(responseText);
     console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
-    return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 2000) });
+    return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 4000) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[extract-exam]", msg);
