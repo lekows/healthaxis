@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
-import { createRequire } from "module";
-
-const _require = createRequire(import.meta.url);
-const pdfParse = _require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
 
 const SYSTEM = `Você é um extrator de resultados de exames laboratoriais.
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
@@ -83,6 +79,9 @@ function parseResponse(text: string): OCRExamData {
 
 async function extractPdfText(buffer: Buffer): Promise<string | null> {
   try {
+    const { createRequire } = await import("module");
+    const _require = createRequire(import.meta.url);
+    const pdfParse = _require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
     const data = await pdfParse(buffer);
     const text = data.text?.trim() ?? "";
     return text.length > 200 ? text : null;
