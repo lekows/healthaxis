@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
     console.log("[extract-exam] responseText (primeiros 800 chars):", responseText.substring(0, 800));
     const examData = parseResponse(responseText);
     console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
-    return NextResponse.json(examData);
+    return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 2000) });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[extract-exam]", msg);

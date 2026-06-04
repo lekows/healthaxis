@@ -102,7 +102,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
           const fd = new FormData();
           fd.append("file", file);
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
-          const data: OCRExamData & { ocr_error?: string } = await res.json();
+          const data: OCRExamData & { ocr_error?: string; _debug_raw?: string } = await res.json();
 
           if (data.ocr_error) {
             setError(`Documento salvo. Falha na extração automática: ${data.ocr_error}`);
@@ -123,7 +123,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
 
           const resultados = data.resultados ?? [];
           if (resultados.length === 0 && !data.medico_solicitante) {
-            setError(`Documento salvo. O OCR não encontrou resultados numéricos. Verifique se o arquivo é um exame laboratorial com valores numéricos visíveis.`);
+            setError(`Documento salvo. Resposta do Claude: ${data._debug_raw ?? "vazia"}`);
             setLoading(false);
             router.refresh();
             return;
