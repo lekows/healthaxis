@@ -104,12 +104,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Arquivo muito grande (máx 8 MB)" }, { status: 413 });
   }
 
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ resultados: [], ocr_error: "Serviço de análise não configurado." });
+  }
+
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
   const isPDF = file.type === "application/pdf";
-  const client = new Anthropic();
 
   try {
+    const client = new Anthropic();
     let responseText = "";
 
     if (isPDF) {

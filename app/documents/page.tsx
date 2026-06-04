@@ -47,8 +47,7 @@ export default async function DocumentsPage() {
           <EmptyState
             icon={FolderOpen}
             title="Nenhum documento ainda"
-            description="Faça upload de laudos, exames ou imagens médicas para começar a organizar seu histórico de saúde."
-            action={{ label: "Enviar primeiro documento", href: "#" }}
+            description='Clique em "Adicionar documento" acima para fazer upload de laudos, exames ou imagens médicas.'
           />
         )}
 
