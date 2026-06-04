@@ -20,6 +20,13 @@ export default async function DashboardPage() {
   const userName = profile?.name ?? "Usuário";
   const score = healthScore ?? { overall: 0, metabolic: 0, cardiovascular: 0, lifestyle: 0, preventive: 0 };
 
+  function scoreColor(val: number) {
+    if (val >= 75) return { color: "#52B788", bg: "#1B4332", glow: "rgba(82,183,136,0.5)" };
+    if (val >= 50) return { color: "#F4A261", bg: "#2D1A06", glow: "rgba(244,162,97,0.5)" };
+    return { color: "#C1440E", bg: "#2D0A06", glow: "rgba(193,68,14,0.5)" };
+  }
+  const sc = scoreColor(score.overall);
+
   const historyBySlug = history.reduce<Record<string, { date_label: string; value: number }[]>>((acc, h) => {
     if (!acc[h.biomarker_slug]) acc[h.biomarker_slug] = [];
     acc[h.biomarker_slug].push({ date_label: h.date_label, value: Number(h.value) });
@@ -46,16 +53,16 @@ export default async function DashboardPage() {
         {/* Score + Quick stats */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
           <div className="lg:col-span-1 p-6 rounded-3xl flex flex-col gap-4 relative overflow-hidden"
-            style={{ background: "#1B4332" }}>
+            style={{ background: sc.bg }}>
             <div className="absolute top-0 right-0 w-40 h-40 blur-3xl opacity-40 pointer-events-none"
-              style={{ background: "radial-gradient(ellipse, rgba(82,183,136,0.5) 0%, transparent 70%)" }} />
+              style={{ background: `radial-gradient(ellipse, ${sc.glow} 0%, transparent 70%)` }} />
             <p className="text-xs uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>Índice Preventivo</p>
             <div className="flex items-end gap-2">
               <span className="text-5xl font-bold text-white">{score.overall}</span>
               <span className="text-lg mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>/100</span>
             </div>
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.15)" }}>
-              <div className="h-full rounded-full" style={{ width: `${score.overall}%`, background: "#52B788" }} />
+              <div className="h-full rounded-full" style={{ width: `${score.overall}%`, background: sc.color }} />
             </div>
             <div className="space-y-2 text-xs">
               {[
@@ -68,7 +75,7 @@ export default async function DashboardPage() {
                   <span style={{ color: "rgba(255,255,255,0.5)" }}>{c.label}</span>
                   <div className="flex items-center gap-2">
                     <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${c.val}%`, background: "#52B788" }} />
+                      <div className="h-full rounded-full" style={{ width: `${c.val}%`, background: sc.color }} />
                     </div>
                     <span style={{ color: "rgba(255,255,255,0.5)" }} className="w-6 text-right">{c.val}</span>
                   </div>
@@ -141,6 +148,7 @@ export default async function DashboardPage() {
                 {trendBiomarkers.map(bm => (
                   <BiomarkerTrendCard
                     key={bm.slug}
+                    slug={bm.slug}
                     name={bm.name}
                     value={Number(bm.value)}
                     unit={bm.unit}

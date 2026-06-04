@@ -84,16 +84,31 @@ function PeriodTabs({ value, onChange }: { value: Period; onChange: (p: Period) 
   );
 }
 
+// ── Biomarker descriptions ─────────────────────────────
+const BIOMARKER_INFO: Record<string, string> = {
+  "ldl-colesterol": "Colesterol 'ruim' — níveis altos entopem artérias e aumentam o risco de infarto e AVC.",
+  "hdl-colesterol": "Colesterol 'bom' — protege o coração removendo gordura das artérias. Quanto maior, melhor.",
+  "triglicerides": "Gordura no sangue — valores altos aumentam risco cardíaco e indicam excesso de açúcar ou álcool na dieta.",
+  "glicemia": "Açúcar no sangue em jejum — indicador precoce de pré-diabetes e resistência à insulina.",
+  "hemoglobina-glicada": "Média do açúcar nos últimos 3 meses — essencial para controle e diagnóstico do diabetes.",
+  "vitamina-d": "Regula imunidade, ossos e humor — deficiência é silenciosa, muito comum e fácil de corrigir.",
+  "tsh": "Controla a tireoide, que regula metabolismo, energia e temperatura corporal.",
+  "hemoglobina": "Transporta oxigênio no sangue — valores baixos causam cansaço e indicam anemia.",
+  "creatinina": "Resíduo muscular filtrado pelos rins — valor elevado pode sinalizar sobrecarga ou lesão renal.",
+  "vitamina-b12": "Essencial para neurônios e glóbulos vermelhos — deficiência causa fadiga e formigamentos.",
+};
+
 // ── BiomarkerDetailModal ───────────────────────────────
 interface DetailModalProps {
   name: string; value: number; unit: string; status: string;
   history: HistoryPoint[]; reference?: Record<string, number>;
-  onClose: () => void;
+  slug?: string; onClose: () => void;
 }
 
-function BiomarkerDetailModal({ name, value, unit, status, history, reference, onClose }: DetailModalProps) {
+function BiomarkerDetailModal({ name, value, unit, status, history, reference, slug, onClose }: DetailModalProps) {
   const [period, setPeriod] = useState<Period>("all");
   const color = getBiomarkerColor(status);
+  const info = slug ? BIOMARKER_INFO[slug] : undefined;
   const refMin = reference?.min;
   const refMax = reference?.max;
   const filtered = filterByPeriod(history, period);
@@ -141,6 +156,15 @@ function BiomarkerDetailModal({ name, value, unit, status, history, reference, o
               </button>
             </div>
           </div>
+
+          {/* Explainer */}
+          {info && (
+            <div className="flex items-start gap-2.5 px-4 py-3 rounded-2xl"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <span className="text-base shrink-0" style={{ color }}>ⓘ</span>
+              <p className="text-sm leading-relaxed" style={{ color: "#9A9688" }}>{info}</p>
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-4 gap-3">
@@ -259,10 +283,10 @@ export function HealthMetricCard({ name, value, unit, status, trend, lastDate, c
 // ── BiomarkerTrendCard ─────────────────────────────────
 interface BiomarkerTrendCardProps {
   name: string; value: number; unit: string; status: string;
-  history: HistoryPoint[]; reference?: Record<string, number>;
+  history: HistoryPoint[]; reference?: Record<string, number>; slug?: string;
 }
 
-export function BiomarkerTrendCard({ name, value, unit, status, history, reference }: BiomarkerTrendCardProps) {
+export function BiomarkerTrendCard({ name, value, unit, status, history, reference, slug }: BiomarkerTrendCardProps) {
   const [period, setPeriod] = useState<Period>("all");
   const [showDetail, setShowDetail] = useState(false);
   const color = getBiomarkerColor(status);
@@ -339,7 +363,7 @@ export function BiomarkerTrendCard({ name, value, unit, status, history, referen
         {showDetail && (
           <BiomarkerDetailModal
             name={name} value={value} unit={unit} status={status}
-            history={history} reference={reference}
+            history={history} reference={reference} slug={slug}
             onClose={() => setShowDetail(false)}
           />
         )}
