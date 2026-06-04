@@ -5,8 +5,8 @@ import { X, Upload, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { createDocument, saveExamBiomarkers } from "@/app/documents/actions";
-import type { OCRResultado } from "@/app/api/extract-exam/route";
+import { createDocument, saveExamBiomarkers, saveDoctor } from "@/app/documents/actions";
+import type { OCRExamData } from "@/app/api/extract-exam/route";
 
 function inferStatus(
   valor: number,
@@ -102,13 +102,23 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
           const fd = new FormData();
           fd.append("file", file);
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
-          const data: { resultados: OCRResultado[]; ocr_error?: string } = await res.json();
+          const data: OCRExamData & { ocr_error?: string } = await res.json();
 
           if (data.ocr_error) {
             setError(`Documento salvo. Falha na extração automática: ${data.ocr_error}`);
             setLoading(false);
             router.refresh();
             return;
+          }
+
+          // Salva médico solicitante se encontrado
+          if (data.medico_solicitante?.crm) {
+            await saveDoctor({
+              name: data.medico_solicitante.nome,
+              crm: data.medico_solicitante.crm,
+              crm_uf: data.medico_solicitante.crm_uf ?? "",
+              examDate: data.data_exame ?? date,
+            });
           }
 
           const resultados = data.resultados ?? [];

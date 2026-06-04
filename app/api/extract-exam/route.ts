@@ -23,10 +23,16 @@ Para cada parâmetro encontrado, retorne:
 - alterado: true se o valor está fora da faixa de referência, false se está dentro
 
 Inclua absolutamente todos os parâmetros com resultado numérico. Não omita nenhum.
+
+Além dos resultados, extraia também (se presentes no documento):
+- medico_solicitante: { nome: string, crm: string, crm_uf: string } — médico que assinou/solicitou o exame (null se não encontrado)
+- laboratorio: { nome: string } — nome do laboratório (null se não encontrado)
+- data_exame: data do exame no formato "YYYY-MM-DD" (null se não encontrada)
+
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
 
 Resposta (apenas JSON):
-{"resultados":[{"slug":"ldl-colesterol","nome":"LDL Colesterol","valor":131,"unidade":"mg/dL","categoria":"Lipídios","ref_min":0,"ref_max":130,"alterado":true}]}`;
+{"resultados":[{"slug":"ldl-colesterol","nome":"LDL Colesterol","valor":131,"unidade":"mg/dL","categoria":"Lipídios","ref_min":0,"ref_max":130,"alterado":true}],"medico_solicitante":{"nome":"João Silva","crm":"12345","crm_uf":"SP"},"laboratorio":{"nome":"Fleury"},"data_exame":"2025-01-15"}`;
 
 export type OCRResultado = {
   slug: string;
@@ -39,20 +45,37 @@ export type OCRResultado = {
   alterado: boolean;
 };
 
-function parseResponse(text: string): OCRResultado[] {
+export type OCRMedico = { nome: string; crm: string; crm_uf: string };
+
+export type OCRExamData = {
+  resultados: OCRResultado[];
+  medico_solicitante: OCRMedico | null;
+  laboratorio: { nome: string } | null;
+  data_exame: string | null;
+};
+
+function parseResponse(text: string): OCRExamData {
+  const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null };
   const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return [];
+  if (!match) return empty;
   try {
     const parsed = JSON.parse(match[0]);
-    return (parsed.resultados ?? []).filter(
+    const resultados = (parsed.resultados ?? []).filter(
       (r: unknown): r is OCRResultado =>
         typeof r === "object" && r !== null &&
         typeof (r as OCRResultado).slug === "string" &&
         typeof (r as OCRResultado).nome === "string" &&
         typeof (r as OCRResultado).valor === "number"
     );
+    const med = parsed.medico_solicitante;
+    const medico = (med && typeof med.nome === "string" && typeof med.crm === "string")
+      ? { nome: med.nome, crm: med.crm, crm_uf: med.crm_uf ?? "" }
+      : null;
+    const lab = parsed.laboratorio?.nome ? { nome: parsed.laboratorio.nome } : null;
+    const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;
+    return { resultados, medico_solicitante: medico, laboratorio: lab, data_exame: dataExame };
   } catch {
-    return [];
+    return empty;
   }
 }
 
@@ -149,8 +172,8 @@ export async function POST(req: NextRequest) {
       responseText = block.type === "text" ? block.text : "";
     }
 
-    const resultados = parseResponse(responseText);
-    return NextResponse.json({ resultados });
+    const examData = parseResponse(responseText);
+    return NextResponse.json(examData);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[extract-exam]", msg);

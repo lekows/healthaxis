@@ -130,6 +130,20 @@ export async function getHealthScore() {
   return data;
 }
 
+export async function getDoctors() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("doctors")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("last_exam_date", { ascending: false });
+
+  return data ?? [];
+}
+
 export async function getHealthScoreHistory() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

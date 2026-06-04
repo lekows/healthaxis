@@ -98,6 +98,51 @@ export async function saveExamBiomarkers(
   }
 }
 
+export async function saveDoctor(data: {
+  name: string;
+  crm: string;
+  crm_uf: string;
+  examDate: string;
+}): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Sessão expirada." };
+
+    const existing = await supabase
+      .from("doctors")
+      .select("id, exam_count, first_exam_date")
+      .eq("user_id", user.id)
+      .eq("crm", data.crm)
+      .eq("crm_uf", data.crm_uf)
+      .maybeSingle();
+
+    if (existing.data) {
+      await supabase.from("doctors").update({
+        last_exam_date: data.examDate,
+        exam_count: (existing.data.exam_count ?? 1) + 1,
+        name: data.name,
+      }).eq("id", existing.data.id);
+    } else {
+      await supabase.from("doctors").insert({
+        user_id: user.id,
+        name: data.name,
+        crm: data.crm,
+        crm_uf: data.crm_uf,
+        first_exam_date: data.examDate,
+        last_exam_date: data.examDate,
+        exam_count: 1,
+      });
+    }
+
+    revalidatePath("/doctors");
+    revalidatePath("/dashboard");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erro ao salvar médico." };
+  }
+}
+
 function toDateLabel(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];

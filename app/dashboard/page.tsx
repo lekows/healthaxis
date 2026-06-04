@@ -3,18 +3,19 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { HealthMetricCard, BiomarkerTrendCard, MetricsGrid } from "@/components/dashboard/MetricCards";
 import { PreventiveReminderCard, RiskAreaCard, RecentDocumentCard } from "@/components/dashboard/EventCards";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
-import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore } from "@/lib/supabase/queries";
-import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical } from "lucide-react";
+import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore, getDoctors } from "@/lib/supabase/queries";
+import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical, Stethoscope } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default async function DashboardPage() {
-  const [profile, biomarkers, history, documents, reminders, healthScore] = await Promise.all([
+  const [profile, biomarkers, history, documents, reminders, healthScore, doctors] = await Promise.all([
     getProfile(),
     getBiomarkers(),
     getBiomarkerHistory(),
     getDocuments(),
     getPreventiveReminders(),
     getHealthScore(),
+    getDoctors(),
   ]);
 
   const userName = profile?.name ?? "Usuário";
@@ -34,6 +35,13 @@ export default async function DashboardPage() {
   }, {});
 
   const urgentReminders = reminders.filter(r => r.priority === "high").length;
+
+  const hasNonOptimal = biomarkers.some(b => b.status !== "optimal");
+  const overdueDoctoralerts = doctors.filter(doc => {
+    if (!doc.last_exam_date) return false;
+    const days = Math.floor((Date.now() - new Date(doc.last_exam_date).getTime()) / 86400000);
+    return days > 180 && hasNonOptimal;
+  }).slice(0, 2);
 
   return (
     <DashboardLayout userName={userName}>
@@ -218,6 +226,41 @@ export default async function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Doctor alerts */}
+        {overdueDoctoralerts.length > 0 && (
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "#5A5A50" }}>Atenção preventiva</h2>
+            <div className="space-y-3">
+              {overdueDoctoralerts.map(doc => {
+                const months = Math.floor((Date.now() - new Date(doc.last_exam_date!).getTime()) / (86400000 * 30));
+                const scheduleUrl = `https://www.doctoralia.com.br/pesquisa?q=${encodeURIComponent(doc.name)}`;
+                return (
+                  <div key={doc.id} className="flex items-center gap-4 p-4 rounded-2xl"
+                    style={{ background: "rgba(244,162,97,0.06)", border: "1px solid rgba(244,162,97,0.2)" }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: "rgba(244,162,97,0.1)", border: "1px solid rgba(244,162,97,0.2)" }}>
+                      <Stethoscope size={15} style={{ color: "#F4A261" }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>
+                        Dr. {doc.name.split(" ").slice(0, 2).join(" ")}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>
+                        Sem consulta há {months} {months === 1 ? "mês" : "meses"} — você tem biomarcadores alterados
+                      </p>
+                    </div>
+                    <a href={scheduleUrl} target="_blank" rel="noopener noreferrer"
+                      className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-xl transition-opacity hover:opacity-80"
+                      style={{ background: "#F4A261", color: "#0D0D0B" }}>
+                      Agendar
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Body map teaser */}
         <Link href="/body-map">
