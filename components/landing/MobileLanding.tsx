@@ -162,9 +162,9 @@ function BenefitCards() {
           </div>
         </div>
         <div className="flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#52B788" }}>Índice de Saúde</p>
-          <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>Acima da média</p>
-          <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>Acompanhe sua evolução ao longo do tempo</p>
+          <p className="text-sm font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#52B788" }}>Índice de Saúde</p>
+          <p className="text-base font-semibold" style={{ color: "#E8E4D9" }}>Acima da média</p>
+          <p className="text-sm mt-0.5" style={{ color: "#9A9688" }}>Acompanhe sua evolução ao longo do tempo</p>
         </div>
       </motion.div>
 
@@ -183,9 +183,9 @@ function BenefitCards() {
           </div>
         </div>
         <div className="flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#F4A261" }}>LDL Colesterol</p>
-          <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>145 → 131 mg/dL</p>
-          <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>Gráficos de tendência para cada biomarcador</p>
+          <p className="text-sm font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#F4A261" }}>LDL Colesterol</p>
+          <p className="text-base font-semibold" style={{ color: "#E8E4D9" }}>145 → 131 mg/dL</p>
+          <p className="text-sm mt-0.5" style={{ color: "#9A9688" }}>Gráficos de tendência para cada biomarcador</p>
         </div>
       </motion.div>
 
@@ -200,9 +200,9 @@ function BenefitCards() {
           <FileText size={20} style={{ color: "#9A9688" }} />
         </div>
         <div className="flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9A9688" }}>Documentos</p>
-          <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>Laudos centralizados</p>
-          <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>Todos seus exames em um só lugar</p>
+          <p className="text-sm font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#9A9688" }}>Documentos</p>
+          <p className="text-base font-semibold" style={{ color: "#E8E4D9" }}>Laudos centralizados</p>
+          <p className="text-sm mt-0.5" style={{ color: "#9A9688" }}>Todos seus exames em um só lugar</p>
         </div>
       </motion.div>
     </div>
@@ -231,10 +231,10 @@ export function MobileLanding() {
             style={{ background: "rgba(82,183,136,0.12)", border: "1px solid rgba(82,183,136,0.2)" }}>
             <Activity size={13} style={{ color: "#52B788" }} />
           </div>
-          <span className="font-semibold text-sm tracking-tight" style={{ color: "#E8E4D9" }}>HealthAxis</span>
+          <span className="font-semibold text-base tracking-tight" style={{ color: "#E8E4D9" }}>HealthAxis</span>
         </Link>
         <Link href="/auth/login"
-          className="px-3 py-1.5 rounded-xl text-xs font-semibold"
+          className="px-3 py-1.5 rounded-xl text-sm font-semibold"
           style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" }}>
           Entrar
         </Link>
@@ -244,7 +244,7 @@ export function MobileLanding() {
       <section className="px-5 pb-8">
         {/* Badge */}
         <motion.div
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-5"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium mb-5"
           style={{ border: "1px solid rgba(82,183,136,0.25)", background: "rgba(82,183,136,0.06)", color: "#52B788" }}
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1, ease: ease.out }}
@@ -267,7 +267,7 @@ export function MobileLanding() {
         </motion.h1>
 
         {/* Subtitle */}
-        <motion.p className="text-sm leading-relaxed mb-6" style={{ color: "#9A9688" }}
+        <motion.p className="text-base leading-relaxed mb-6" style={{ color: "#9A9688" }}
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.25, ease: ease.out }}
         >
@@ -280,7 +280,7 @@ export function MobileLanding() {
           transition={{ duration: 0.6, delay: 0.32, ease: ease.out }}
         >
           <Link href="/dashboard"
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold"
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-base font-semibold"
             style={{ background: "#52B788", color: "#0D0D0B", boxShadow: "0 0 28px rgba(82,183,136,0.3)" }}>
             Começar agora
             <motion.span animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}>
@@ -290,7 +290,7 @@ export function MobileLanding() {
         </motion.div>
 
         {/* Trust line */}
-        <motion.div className="flex items-center justify-center gap-4 text-xs mb-8"
+        <motion.div className="flex items-center justify-center gap-4 text-sm mb-8"
           style={{ color: "#5A5A50" }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}
         >
@@ -316,8 +316,8 @@ export function MobileLanding() {
           viewport={{ once: true }} transition={{ duration: 0.5, ease: ease.out }}
           className="mb-5"
         >
-          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "#52B788" }}>O que você vê</p>
-          <p className="text-xl font-bold" style={{ color: "#E8E4D9" }}>Dados reais. Visão clara.</p>
+          <p className="text-sm font-semibold uppercase tracking-widest mb-1" style={{ color: "#52B788" }}>O que você vê</p>
+          <p className="text-2xl font-bold" style={{ color: "#E8E4D9" }}>Dados reais. Visão clara.</p>
         </motion.div>
         <BenefitCards />
       </section>
@@ -329,8 +329,8 @@ export function MobileLanding() {
           viewport={{ once: true }} transition={{ duration: 0.5, ease: ease.out }}
           className="mb-5"
         >
-          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "#52B788" }}>Como funciona</p>
-          <p className="text-xl font-bold" style={{ color: "#E8E4D9" }}>Simples e rápido.</p>
+          <p className="text-sm font-semibold uppercase tracking-widest mb-1" style={{ color: "#52B788" }}>Como funciona</p>
+          <p className="text-2xl font-bold" style={{ color: "#E8E4D9" }}>Simples e rápido.</p>
         </motion.div>
 
         <div className="space-y-4">
@@ -344,8 +344,8 @@ export function MobileLanding() {
                 <span className="text-xs font-bold" style={{ color }}>{n}</span>
               </div>
               <div>
-                <p className="text-sm font-semibold mb-0.5" style={{ color: "#E8E4D9" }}>{title}</p>
-                <p className="text-xs" style={{ color: "#9A9688" }}>{desc}</p>
+                <p className="text-base font-semibold mb-0.5" style={{ color: "#E8E4D9" }}>{title}</p>
+                <p className="text-sm" style={{ color: "#9A9688" }}>{desc}</p>
               </div>
             </motion.div>
           ))}
@@ -367,20 +367,20 @@ export function MobileLanding() {
               style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)" }}>
               <Activity size={20} style={{ color: "#52B788" }} />
             </div>
-            <h2 className="text-xl font-bold mb-2" style={{ color: "#E8E4D9" }}>
+            <h2 className="text-2xl font-bold mb-2" style={{ color: "#E8E4D9" }}>
               Comece a cuidar da sua saúde <span style={{ color: "#52B788" }}>hoje</span>.
             </h2>
-            <p className="text-sm mb-5" style={{ color: "#9A9688" }}>
+            <p className="text-base mb-5" style={{ color: "#9A9688" }}>
               Gratuito. Sem cartão de crédito.
             </p>
 
             <Link href="/dashboard"
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-semibold mb-3"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-base font-semibold mb-3"
               style={{ background: "#52B788", color: "#0D0D0B" }}>
               Acessar o painel <ArrowRight size={14} />
             </Link>
             <Link href="/report"
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-base"
               style={{ border: "1px solid rgba(255,255,255,0.08)", color: "#9A9688" }}>
               Ver relatório de exemplo
             </Link>
@@ -388,7 +388,7 @@ export function MobileLanding() {
         </motion.div>
 
         {/* Privacy note */}
-        <div className="flex flex-wrap justify-center gap-3 mt-5 text-xs" style={{ color: "#5A5A50" }}>
+        <div className="flex flex-wrap justify-center gap-3 mt-5 text-sm" style={{ color: "#5A5A50" }}>
           {["Criptografia de ponta a ponta", "Dados não são vendidos", "Conforme LGPD"].map(item => (
             <div key={item} className="flex items-center gap-1">
               <CheckCircle2 size={9} style={{ color: "#52B788" }} /> {item}
