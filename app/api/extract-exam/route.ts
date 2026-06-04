@@ -55,16 +55,27 @@ export type OCRExamData = {
 function parseResponse(text: string): OCRExamData {
   const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null };
   const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return empty;
+  if (!match) {
+    console.log("[extract-exam] parseResponse: nenhum JSON encontrado no texto:", text.substring(0, 300));
+    return empty;
+  }
   try {
     const parsed = JSON.parse(match[0]);
-    const resultados = (parsed.resultados ?? []).filter(
-      (r: unknown): r is OCRResultado =>
-        typeof r === "object" && r !== null &&
-        typeof (r as OCRResultado).slug === "string" &&
-        typeof (r as OCRResultado).nome === "string" &&
-        typeof (r as OCRResultado).valor === "number"
-    );
+    console.log("[extract-exam] resultados brutos:", JSON.stringify(parsed.resultados ?? []).substring(0, 500));
+    const resultados = (parsed.resultados ?? [])
+      .map((r: unknown) => {
+        if (typeof r !== "object" || r === null) return null;
+        const item = r as Record<string, unknown>;
+        const valor = typeof item.valor === "number"
+          ? item.valor
+          : typeof item.valor === "string"
+            ? parseFloat(item.valor)
+            : null;
+        if (typeof item.slug !== "string" || typeof item.nome !== "string" || valor === null || isNaN(valor)) return null;
+        return { ...item, valor } as OCRResultado;
+      })
+      .filter((r: OCRResultado | null): r is OCRResultado => r !== null);
+    console.log("[extract-exam] resultados parseados:", resultados.length);
     const med = parsed.medico_solicitante;
     const medico = (med && typeof med.nome === "string" && med.nome.trim())
       ? { nome: med.nome.trim(), crm: med.crm ?? null, crm_uf: med.crm_uf ?? null }
@@ -72,7 +83,8 @@ function parseResponse(text: string): OCRExamData {
     const lab = parsed.laboratorio?.nome ? { nome: parsed.laboratorio.nome } : null;
     const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;
     return { resultados, medico_solicitante: medico, laboratorio: lab, data_exame: dataExame };
-  } catch {
+  } catch (e) {
+    console.error("[extract-exam] parseResponse erro:", e);
     return empty;
   }
 }
@@ -177,7 +189,9 @@ export async function POST(req: NextRequest) {
       responseText = block.type === "text" ? block.text : "";
     }
 
+    console.log("[extract-exam] responseText (primeiros 800 chars):", responseText.substring(0, 800));
     const examData = parseResponse(responseText);
+    console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
     return NextResponse.json(examData);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

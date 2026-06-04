@@ -122,6 +122,12 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
           }
 
           const resultados = data.resultados ?? [];
+          if (resultados.length === 0 && !data.medico_solicitante) {
+            setError(`Documento salvo. O OCR não encontrou resultados numéricos. Verifique se o arquivo é um exame laboratorial com valores numéricos visíveis.`);
+            setLoading(false);
+            router.refresh();
+            return;
+          }
           if (resultados.length > 0) {
             const bioResult = await saveExamBiomarkers(
               resultados.map(r => ({
