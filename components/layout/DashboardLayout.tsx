@@ -153,8 +153,8 @@ export function DashboardLayout({ children, userName = "Usuário" }: { children:
             { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
             { href: "/body-map", icon: Activity, label: "Mapa" },
             { href: "/exams", icon: FlaskConical, label: "Exames" },
-            { href: "/documents", icon: FolderOpen, label: "Documentos" },
-            { href: "/profile", icon: User, label: "Perfil" },
+            { href: "/doctors", icon: Stethoscope, label: "Médicos" },
+            { href: "/documents", icon: FolderOpen, label: "Docs" },
           ].map(({ href, icon: Icon, label }) => {
             const active = pathname === href;
             return (
