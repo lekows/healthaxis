@@ -27,10 +27,7 @@ Além dos resultados, extraia também (se presentes no documento):
 - laboratorio: { nome: string } — nome do laboratório (null se não encontrado)
 - data_exame: data do exame no formato "YYYY-MM-DD" (null se não encontrada)
 
-Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
-
-Resposta (apenas JSON):
-{"resultados":[{"slug":"ldl-colesterol","nome":"LDL Colesterol","valor":131,"unidade":"mg/dL","categoria":"Lipídios","ref_min":0,"ref_max":130,"alterado":true}],"medico_solicitante":{"nome":"João Silva","crm":"12345","crm_uf":"SP"},"laboratorio":{"nome":"Fleury"},"data_exame":"2025-01-15"}`;
+Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.`;
 
 export type OCRResultado = {
   slug: string;
@@ -89,14 +86,23 @@ function parseResponse(text: string): OCRExamData {
   }
 }
 
+function cleanPdfText(raw: string): string {
+  return raw
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^[.\-–—=*_]{3,}$/gm, "")
+    .trim();
+}
+
 async function extractPdfText(buffer: Buffer): Promise<string | null> {
   try {
     const { createRequire } = await import("module");
     const _require = createRequire(import.meta.url);
     const pdfParse = _require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
     const data = await pdfParse(buffer);
-    const text = data.text?.trim() ?? "";
-    return text.length > 200 ? text : null;
+    const cleaned = cleanPdfText(data.text ?? "");
+    return cleaned.length > 200 ? cleaned : null;
   } catch {
     return null;
   }
@@ -108,10 +114,11 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
   const form = await req.formData();
+  const pastedText = form.get("text") as string | null;
   const file = form.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "Arquivo ausente" }, { status: 400 });
 
-  if (file.size > 8 * 1024 * 1024) {
+  if (!file && !pastedText) return NextResponse.json({ error: "Arquivo ou texto ausente" }, { status: 400 });
+  if (file && file.size > 8 * 1024 * 1024) {
     return NextResponse.json({ error: "Arquivo muito grande (máx 8 MB)" }, { status: 413 });
   }
 
@@ -119,9 +126,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ resultados: [], ocr_error: "Serviço de análise não configurado." });
   }
 
-  const bytes = await file.arrayBuffer();
+  // Texto colado pelo usuário — caminho direto, zero tokens de ruído de PDF
+  if (pastedText && pastedText.trim().length > 10) {
+    try {
+      const client = new Anthropic();
+      const truncated = pastedText.length > 12000 ? pastedText.substring(0, 12000) : pastedText;
+      console.log(`[extract-exam] Texto colado (${pastedText.length} chars). Usando texto direto.`);
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 8192,
+        system: SYSTEM,
+        messages: [{ role: "user", content: `${PROMPT_BASE}\n\n---\n\n${truncated}` }],
+      });
+      const block = msg.content[0];
+      const responseText = block.type === "text" ? block.text : "";
+      const examData = parseResponse(responseText);
+      return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 4000) });
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      const isRateLimit = raw.includes("rate_limit") || raw.includes("429");
+      return NextResponse.json({ resultados: [], ocr_error: isRateLimit ? "Limite de requisições atingido. Aguarde 1 minuto e tente novamente." : raw });
+    }
+  }
+
+  const bytes = await file!.arrayBuffer();
   const buffer = Buffer.from(bytes);
-  const isPDF = file.type === "application/pdf";
+  const isPDF = file!.type === "application/pdf";
 
   try {
     const client = new Anthropic();
@@ -170,8 +200,8 @@ export async function POST(req: NextRequest) {
       // Imagem (JPG, PNG, WebP)
       const base64 = buffer.toString("base64");
       const mediaType = (
-        ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)
-          ? file.type : "image/jpeg"
+        ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file!.type)
+          ? file!.type : "image/jpeg"
       ) as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
       const msg = await client.messages.create({

@@ -31,13 +31,15 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
   const router       = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [file, setFile]         = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [title, setTitle]       = useState("");
-  const [docType, setDocType]   = useState("Exame Laboratorial");
-  const [lab, setLab]           = useState("");
-  const [date, setDate]         = useState(() => new Date().toISOString().split("T")[0]);
-  const [tags, setTags]         = useState("");
+  const [inputMode, setInputMode]   = useState<"file" | "text">("file");
+  const [file, setFile]             = useState<File | null>(null);
+  const [pastedText, setPastedText] = useState("");
+  const [dragOver, setDragOver]     = useState(false);
+  const [title, setTitle]           = useState("");
+  const [docType, setDocType]       = useState("Exame Laboratorial");
+  const [lab, setLab]               = useState("");
+  const [date, setDate]             = useState(() => new Date().toISOString().split("T")[0]);
+  const [tags, setTags]             = useState("");
 
   const [loading, setLoading]       = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -95,12 +97,17 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
       });
       if (docResult?.error) { setError(docResult.error); return; }
 
-      // 3. Extração automática via OCR (só para exames laboratoriais com arquivo)
-      if (file && docType === "Exame Laboratorial") {
+      // 3. Extração automática via OCR (exames laboratoriais com arquivo ou texto colado)
+      const hasContent = inputMode === "text" ? pastedText.trim().length > 10 : !!file;
+      if (hasContent && docType === "Exame Laboratorial") {
         setLoadingMsg("Analisando exame…");
         try {
           const fd = new FormData();
-          fd.append("file", file);
+          if (inputMode === "text") {
+            fd.append("text", pastedText.trim());
+          } else {
+            fd.append("file", file!);
+          }
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
           const data: OCRExamData & { ocr_error?: string; _debug_raw?: string } = await res.json();
 
@@ -188,7 +195,23 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
 
+          {/* Toggle arquivo / colar texto */}
+          <div className="flex rounded-xl p-0.5 gap-0.5" style={{ background: "#1C1C19", border: "1px solid rgba(255,255,255,0.08)" }}>
+            {(["file", "text"] as const).map(mode => (
+              <button key={mode} disabled={loading} onClick={() => setInputMode(mode)}
+                className="flex-1 py-1.5 rounded-[10px] text-xs font-medium transition-all"
+                style={{
+                  background: inputMode === mode ? "rgba(82,183,136,0.12)" : "transparent",
+                  color: inputMode === mode ? "#52B788" : "#5A5A50",
+                  border: inputMode === mode ? "1px solid rgba(82,183,136,0.2)" : "1px solid transparent",
+                }}>
+                {mode === "file" ? "Arquivo" : "Colar texto"}
+              </button>
+            ))}
+          </div>
+
           {/* Drop zone */}
+          {inputMode === "file" && (
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
@@ -218,6 +241,25 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
               </div>
             )}
           </div>
+          )}
+
+          {/* Área de texto colado */}
+          {inputMode === "text" && (
+          <div>
+            <textarea
+              value={pastedText}
+              onChange={e => setPastedText(e.target.value)}
+              disabled={loading}
+              placeholder="Cole aqui o texto do exame copiado do portal do laboratório (Fleury, Sabin, DASA…)"
+              rows={6}
+              className="w-full rounded-2xl px-4 py-3 text-sm outline-none resize-none"
+              style={{ background: "rgba(255,255,255,0.02)", border: "2px dashed rgba(255,255,255,0.12)", color: "#E8E4D9" }}
+            />
+            {pastedText.length > 0 && (
+              <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>{pastedText.length} caracteres</p>
+            )}
+          </div>
+          )}
 
           {/* Campos */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
