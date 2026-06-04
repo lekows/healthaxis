@@ -45,7 +45,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardLayout userName={userName}>
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+      <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-5 lg:space-y-8">
 
         {/* Header */}
         <div>
@@ -92,14 +92,14 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="lg:col-span-3 flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0">
             {[
               { icon: FileText, label: "Documentos", value: String(documents.length), sub: `${documents.filter(d => d.status === "reviewed").length} revisados`, color: "#52B788" },
               { icon: Activity, label: "Biomarcadores", value: String(biomarkers.length), sub: `${biomarkers.filter(b => b.status === "optimal").length} em dia`, color: "#52B788" },
               { icon: Bell, label: "Lembretes", value: String(reminders.length), sub: `${urgentReminders} urgentes`, color: urgentReminders > 0 ? "#C1440E" : "#52B788" },
               { icon: TrendingUp, label: "Atualização", value: "Hoje", sub: "dados reais", color: "#9A9688" }
             ].map(({ icon: Icon, label, value, sub, color }) => (
-              <div key={label} className="p-5 rounded-3xl flex flex-col gap-3"
+              <div key={label} className="shrink-0 w-36 sm:w-auto p-4 sm:p-5 rounded-3xl flex flex-col gap-2 sm:gap-3"
                 style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <Icon size={15} style={{ color }} />
                 <div>

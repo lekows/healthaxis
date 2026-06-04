@@ -138,7 +138,7 @@ export function DashboardLayout({ children, userName = "Usuário" }: { children:
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.35, ease: ease.out }}
-            className="min-h-screen lg:pb-0 pb-20"
+            className="min-h-screen lg:pb-0 pb-16"
           >
             {children}
           </motion.main>
@@ -146,7 +146,7 @@ export function DashboardLayout({ children, userName = "Usuário" }: { children:
 
         {/* Bottom navigation — mobile only */}
         <nav
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around px-2 py-2"
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around px-2 py-1"
           style={{ background: "rgba(13,13,11,0.92)", backdropFilter: "blur(16px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
         >
           {[
