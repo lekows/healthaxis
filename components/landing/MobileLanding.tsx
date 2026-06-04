@@ -140,7 +140,7 @@ function Sparkline() {
 const BIOMARKERS = [
   { name: "LDL", value: "131", unit: "mg/dL", color: "#F4A261" },
   { name: "HDL", value: "43", unit: "mg/dL", color: "#F4A261" },
-  { name: "Trigli-\ncerídeos", value: "148", unit: "mg/dL", color: "#F4A261" },
+  { name: "Triglicerídeos", value: "148", unit: "mg/dL", color: "#F4A261" },
   { name: "Glicemia", value: "92", unit: "mg/dL", color: "#52B788" },
   { name: "HbA1c", value: "5,1", unit: "%", color: "#52B788" },
   { name: "Vitamina D", value: "18", unit: "ng/mL", color: "#C1440E" },
@@ -153,33 +153,41 @@ function BiomarkerGrid() {
       <p className="text-xs uppercase tracking-widest mb-3" style={{ color: "#5A5A50" }}>
         Biomarcadores monitorados
       </p>
-      <div className="grid grid-cols-4 gap-2">
-        {BIOMARKERS.map((bm, i) => (
-          <motion.div
-            key={bm.name}
-            className="rounded-2xl p-2.5 flex flex-col items-center text-center"
-            style={{
-              background: `rgba(${bm.color === "#52B788" ? "82,183,136" : bm.color === "#F4A261" ? "244,162,97" : "193,68,14"},0.07)`,
-              border: `1px solid rgba(${bm.color === "#52B788" ? "82,183,136" : bm.color === "#F4A261" ? "244,162,97" : "193,68,14"},0.2)`,
-            }}
-            initial={{ opacity: 0, scale: 0.85 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.35, delay: i * 0.05, ease: ease.out }}
-          >
+      <div className="grid grid-cols-2 gap-3">
+        {BIOMARKERS.map((bm, i) => {
+          const rgb = bm.color === "#52B788" ? "82,183,136" : bm.color === "#F4A261" ? "244,162,97" : "193,68,14";
+          return (
             <motion.div
-              className="w-2 h-2 rounded-full mb-1.5"
-              style={{ background: bm.color, boxShadow: `0 0 6px ${bm.color}66` }}
-              animate={{ opacity: [0.7, 1, 0.7] }}
-              transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
-            />
-            <p className="text-[10px] leading-tight font-medium mb-1 whitespace-pre-line" style={{ color: "#9A9688" }}>
-              {bm.name}
-            </p>
-            <p className="text-xs font-bold leading-none" style={{ color: bm.color }}>{bm.value}</p>
-            <p className="text-[9px] mt-0.5" style={{ color: "#5A5A50" }}>{bm.unit}</p>
-          </motion.div>
-        ))}
+              key={bm.name}
+              className="flex items-center gap-3 p-4 rounded-3xl"
+              style={{
+                background: `rgba(${rgb},0.07)`,
+                border: `1px solid rgba(${rgb},0.2)`,
+              }}
+              initial={{ opacity: 0, x: -16 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: i * 0.06, ease: ease.out }}
+            >
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+                style={{ background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.2)` }}>
+                <motion.div
+                  className="w-3 h-3 rounded-full"
+                  style={{ background: bm.color, boxShadow: `0 0 8px ${bm.color}88` }}
+                  animate={{ opacity: [0.7, 1, 0.7] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide truncate mb-0.5" style={{ color: bm.color }}>
+                  {bm.name}
+                </p>
+                <p className="text-base font-bold leading-none" style={{ color: "#E8E4D9" }}>{bm.value}</p>
+                <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>{bm.unit}</p>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
