@@ -175,8 +175,9 @@ export async function POST(req: NextRequest) {
       const pdfText = await extractPdfText(buffer);
 
       if (pdfText) {
-        // PDF digital com texto selecionável — envia só o texto (limitado para caber no rate limit)
-        const truncated = pdfText.length > 12000 ? pdfText.substring(0, 12000) : pdfText;
+        // PDF digital com texto selecionável — envia o texto completo (até 50k chars para capturar
+        // históricos e tabela comparativa em laudos de múltiplas páginas como Sabin/Fleury)
+        const truncated = pdfText.length > 50000 ? pdfText.substring(0, 50000) : pdfText;
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
