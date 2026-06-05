@@ -147,7 +147,8 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
                   ...(r.ref_min !== null ? { min: r.ref_min } : {}),
                   ...(r.ref_max !== null ? { max: r.ref_max } : {}),
                 },
-                status: inferStatus(r.valor, r.ref_min, r.ref_max, r.alterado),
+                status:    inferStatus(r.valor, r.ref_min, r.ref_max, r.alterado),
+                historico: r.historico ?? [],
               })),
               date
             );

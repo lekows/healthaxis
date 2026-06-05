@@ -17,6 +17,7 @@ Para cada parâmetro encontrado, retorne:
 - ref_min: valor mínimo da faixa de referência do laboratório (null se não disponível no documento)
 - ref_max: valor máximo da faixa de referência do laboratório (null se não disponível no documento)
 - alterado: true se o valor está fora da faixa de referência, false se está dentro
+- historico: se o documento contiver tabela comparativa ou gráficos com valores anteriores, extraia até 3 resultados anteriores no formato [{ "data": "YYYY-MM-DD", "valor": number }]. Use o 1º dia do mês quando a data for só mês/ano (ex: "Out/24" → "2024-10-01"). Array vazio [] se não houver histórico.
 
 Inclua absolutamente todos os parâmetros com resultado numérico. Não omita nenhum.
 
@@ -38,6 +39,7 @@ export type OCRResultado = {
   ref_min: number | null;
   ref_max: number | null;
   alterado: boolean;
+  historico?: { data: string; valor: number }[];
 };
 
 export type OCRMedico = { nome: string; crm: string | null; crm_uf: string | null };
@@ -69,7 +71,15 @@ function parseResponse(text: string): OCRExamData {
             ? parseFloat(item.valor)
             : null;
         if (typeof item.slug !== "string" || typeof item.nome !== "string" || valor === null || isNaN(valor)) return null;
-        return { ...item, valor } as OCRResultado;
+        const historico = Array.isArray(item.historico)
+          ? (item.historico as unknown[])
+              .filter((h): h is { data: string; valor: number } =>
+                typeof (h as Record<string, unknown>).data === "string" &&
+                typeof (h as Record<string, unknown>).valor === "number"
+              )
+              .slice(0, 3)
+          : [];
+        return { ...item, valor, historico } as OCRResultado;
       })
       .filter((r: OCRResultado | null): r is OCRResultado => r !== null);
     console.log("[extract-exam] resultados parseados:", resultados.length);

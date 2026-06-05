@@ -54,6 +54,7 @@ export async function saveExamBiomarkers(
     value: number;
     reference: Record<string, number>;
     status: string;
+    historico?: { data: string; valor: number }[];
   }[],
   examDate: string
 ): Promise<ActionResult> {
@@ -95,16 +96,33 @@ export async function saveExamBiomarkers(
     if (upsertErr) return { error: upsertErr.message };
 
     const dateLabel = toDateLabel(examDate);
-    const { error: histErr } = await supabase.from("biomarker_history").insert(
+    const { error: histErr } = await supabase.from("biomarker_history").upsert(
       entries.map((e) => ({
         user_id:        user.id,
         biomarker_slug: e.slug,
         date_label:     dateLabel,
         value:          e.value,
         recorded_at:    examDate,
-      }))
+      })),
+      { onConflict: "user_id,biomarker_slug,recorded_at", ignoreDuplicates: true }
     );
     if (histErr) return { error: histErr.message };
+
+    const historicEntries = entries.flatMap(e =>
+      (e.historico ?? []).map(h => ({
+        user_id:        user.id,
+        biomarker_slug: e.slug,
+        date_label:     toDateLabel(h.data),
+        value:          h.valor,
+        recorded_at:    h.data,
+      }))
+    );
+    if (historicEntries.length > 0) {
+      await supabase.from("biomarker_history").upsert(
+        historicEntries,
+        { onConflict: "user_id,biomarker_slug,recorded_at", ignoreDuplicates: true }
+      );
+    }
 
     revalidatePath("/exams");
     revalidatePath("/dashboard");

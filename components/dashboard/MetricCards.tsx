@@ -238,45 +238,67 @@ function BiomarkerDetailModal({ name, value, unit, status, history, reference, s
 interface HealthMetricCardProps {
   name: string; value: string | number; unit: string;
   status: string; trend: string; lastDate: string; category: string;
+  slug?: string; history?: HistoryPoint[]; reference?: Record<string, number>;
 }
 
-export function HealthMetricCard({ name, value, unit, status, trend, lastDate, category }: HealthMetricCardProps) {
+export function HealthMetricCard({ name, value, unit, status, trend, lastDate, category, slug, history, reference }: HealthMetricCardProps) {
+  const [showDetail, setShowDetail] = useState(false);
   const color = getBiomarkerColor(status);
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
   const variantMap: Record<string, "success" | "warning" | "danger" | "muted"> = {
     optimal: "success", attention: "warning", risk: "danger", critical: "danger", high: "danger", low: "warning"
   };
   const barWidth = status === "optimal" ? 40 : status === "attention" ? 70 : 90;
+  const hasHistory = history && history.length > 0;
 
   return (
-    <HoverCard
-      className="rounded-3xl p-5 flex flex-col gap-3 cursor-default"
-      style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wider font-medium" style={{ color: "#5A5A50" }}>{category}</p>
-          <p className="text-sm font-semibold mt-0.5" style={{ color: "#E8E4D9" }}>{name}</p>
+    <>
+      <HoverCard
+        className="rounded-3xl p-5 flex flex-col gap-3"
+        style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)", cursor: hasHistory ? "pointer" : "default" }}
+        onClick={hasHistory ? () => setShowDetail(true) : undefined}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wider font-medium" style={{ color: "#5A5A50" }}>{category}</p>
+            <p className="text-sm font-semibold mt-0.5" style={{ color: "#E8E4D9" }}>{name}</p>
+          </div>
+          <div className="flex flex-col items-end gap-1.5">
+            <Badge variant={variantMap[status] ?? "muted"}>{getBiomarkerLabel(status)}</Badge>
+            {hasHistory && <BarChart2 size={11} style={{ color: "#5A5A50" }} />}
+          </div>
         </div>
-        <Badge variant={variantMap[status] ?? "muted"}>{getBiomarkerLabel(status)}</Badge>
-      </div>
-      <div className="flex items-end gap-2">
-        <motion.span className="text-3xl font-bold"
-          style={{ color, fontVariantNumeric: "tabular-nums" }}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          {value}
-        </motion.span>
-        <span className="text-sm mb-1" style={{ color: "#5A5A50" }}>{unit}</span>
-        <motion.div className="flex items-center ml-auto mb-1" style={{ color }}
-          animate={{ y: [0, -2, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
-          <TrendIcon size={13} />
-        </motion.div>
-      </div>
-      <AnimatedProgressBar value={barWidth} color={color} />
-      <p className="text-xs" style={{ color: "#5A5A50" }}>
-        Atualizado em {new Date(lastDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-      </p>
-    </HoverCard>
+        <div className="flex items-end gap-2">
+          <motion.span className="text-3xl font-bold"
+            style={{ color, fontVariantNumeric: "tabular-nums" }}
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            {value}
+          </motion.span>
+          <span className="text-sm mb-1" style={{ color: "#5A5A50" }}>{unit}</span>
+          <motion.div className="flex items-center ml-auto mb-1" style={{ color }}
+            animate={{ y: [0, -2, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
+            <TrendIcon size={13} />
+          </motion.div>
+        </div>
+        <AnimatedProgressBar value={barWidth} color={color} />
+        <p className="text-xs" style={{ color: "#5A5A50" }}>
+          {hasHistory
+            ? `${history.length} medições · toque para detalhes`
+            : `Atualizado em ${new Date(lastDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`
+          }
+        </p>
+      </HoverCard>
+
+      <AnimatePresence>
+        {showDetail && hasHistory && (
+          <BiomarkerDetailModal
+            name={name} value={Number(value)} unit={unit} status={status}
+            history={history} reference={reference} slug={slug}
+            onClose={() => setShowDetail(false)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
