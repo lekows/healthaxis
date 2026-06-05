@@ -180,11 +180,23 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
           const fd = new FormData();
           if (inputMode === "text") {
             fd.append("text", pastedText.trim());
+          } else if (fileUrl) {
+            // Arquivo já está no Storage — manda a URL para não estourar o limite de body do Vercel.
+            fd.append("file_url", fileUrl);
+            fd.append("file_type", file!.type);
           } else {
             fd.append("file", file!);
           }
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
-          const data: OCRExamData & { ocr_error?: string } = await res.json();
+          const raw = await res.text();
+          let data: (OCRExamData & { ocr_error?: string }) | null = null;
+          try { data = JSON.parse(raw); } catch { /* resposta não-JSON (erro de infraestrutura) */ }
+          if (!res.ok || !data) {
+            setError(`Documento salvo. Falha na extração automática: ${res.status === 413 ? "arquivo muito grande" : "o servidor retornou um erro inesperado"}. Tente reenviar.`);
+            setLoading(false);
+            router.refresh();
+            return;
+          }
 
           if (data.ocr_error) {
             setError(`Documento salvo. Falha na extração automática: ${data.ocr_error}`);
