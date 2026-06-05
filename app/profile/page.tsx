@@ -1,8 +1,9 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, Badge, Button } from "@/components/ui";
+import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getMedications, getFamilyHistory } from "@/lib/supabase/queries";
-import { User, Pill, Users, Edit3 } from "lucide-react";
+import { Pill, Users, FlaskConical } from "lucide-react";
+import { ProfileEditModal } from "@/components/profile/ProfileEditModal";
 
 export default async function ProfilePage() {
   const [profile, medications, familyHistory] = await Promise.all([
@@ -30,8 +31,25 @@ export default async function ProfilePage() {
             <h1 className="text-2xl font-bold text-ink">Perfil de Saúde</h1>
             <p className="text-ink-muted text-sm mt-1">Informações pessoais e histórico de saúde.</p>
           </div>
-          <Button variant="outline" size="sm"><Edit3 size={14} /> Editar</Button>
+          <ProfileEditModal profile={{
+            name: profile.name,
+            dob: profile.dob ?? null,
+            sex: profile.sex ?? null,
+            blood: profile.blood ?? null,
+            height: profile.height ?? null,
+            weight: profile.weight ?? null,
+          }} />
         </div>
+
+        {!profile.sex && (
+          <div className="flex items-center gap-3 p-4 rounded-2xl"
+            style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.2)" }}>
+            <FlaskConical size={15} style={{ color: "#52B788" }} />
+            <p className="text-sm" style={{ color: "#9A9688" }}>
+              Preencha seu <strong style={{ color: "#E8E4D9" }}>sexo biológico</strong> no perfil para receber faixas de referência laboratoriais personalizadas.
+            </p>
+          </div>
+        )}
 
         <Card className="p-6">
           <div className="flex items-center gap-4 mb-6">
@@ -44,8 +62,9 @@ export default async function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             {[
+              { label: "Sexo biológico", value: profile.sex === "masculino" ? "Masculino" : profile.sex === "feminino" ? "Feminino" : profile.sex === "outro" ? "Outro" : "—" },
               { label: "Tipo sanguíneo", value: profile.blood ?? "—" },
               { label: "Altura", value: profile.height ? `${profile.height} cm` : "—" },
               { label: "Peso atual", value: profile.weight ? `${profile.weight} kg` : "—" },

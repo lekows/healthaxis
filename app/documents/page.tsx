@@ -26,7 +26,7 @@ export default async function DocumentsPage() {
             <h1 className="text-2xl font-bold text-ink">Documentos</h1>
             <p className="text-ink-muted text-sm mt-1">{documents.length} arquivos · {reviewed} revisados</p>
           </div>
-          <UploadDocumentButton />
+          <UploadDocumentButton userName={profile?.name} />
         </div>
 
         <div className="grid grid-cols-3 gap-4">

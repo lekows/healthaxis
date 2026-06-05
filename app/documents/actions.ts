@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getReference, inferStatus } from "@/lib/biomarker-references";
 
 type ActionResult = { error?: string };
 
@@ -53,6 +54,7 @@ export async function saveExamBiomarkers(
     value: number;
     reference: Record<string, number>;
     status: string;
+    historico?: { data: string; valor: number }[];
   }[],
   examDate: string
 ): Promise<ActionResult> {
@@ -61,8 +63,23 @@ export async function saveExamBiomarkers(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Sessão expirada." };
 
+    const { data: profile } = await supabase.from("profiles").select("sex, dob").eq("id", user.id).single();
+    const sex = (profile?.sex as string | null) ?? null;
+    const ageYears = profile?.dob
+      ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25 * 24 * 3600 * 1000))
+      : null;
+
+    const resolved = entries.map((e) => {
+      const staticRef = getReference(e.slug, sex, ageYears);
+      return {
+        ...e,
+        reference: staticRef ?? e.reference,
+        status:    staticRef ? inferStatus(e.value, staticRef) : e.status,
+      };
+    });
+
     const { error: upsertErr } = await supabase.from("biomarkers").upsert(
-      entries.map((e) => ({
+      resolved.map((e) => ({
         user_id:   user.id,
         slug:      e.slug,
         name:      e.name,
@@ -79,16 +96,42 @@ export async function saveExamBiomarkers(
     if (upsertErr) return { error: upsertErr.message };
 
     const dateLabel = toDateLabel(examDate);
-    const { error: histErr } = await supabase.from("biomarker_history").insert(
-      entries.map((e) => ({
+    const allPoints = [
+      ...entries.map((e) => ({ slug: e.slug, recorded_at: examDate, date_label: dateLabel, value: e.value })),
+      ...entries.flatMap((e) =>
+        (e.historico ?? []).map((h) => ({
+          slug: e.slug, recorded_at: h.data, date_label: toDateLabel(h.data), value: h.valor,
+        }))
+      ),
+    ];
+
+    // Dedup sem depender de unique constraint no banco: busca pontos já gravados e
+    // insere só os que faltam. Idempotente — reenviar o mesmo laudo não duplica.
+    const { data: existing } = await supabase
+      .from("biomarker_history")
+      .select("biomarker_slug, recorded_at")
+      .eq("user_id", user.id);
+    const seen = new Set((existing ?? []).map((r) => `${r.biomarker_slug}|${r.recorded_at}`));
+
+    const toInsert = allPoints
+      .filter((p) => {
+        const key = `${p.slug}|${p.recorded_at}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((p) => ({
         user_id:        user.id,
-        biomarker_slug: e.slug,
-        date_label:     dateLabel,
-        value:          e.value,
-        recorded_at:    examDate,
-      }))
-    );
-    if (histErr) return { error: histErr.message };
+        biomarker_slug: p.slug,
+        date_label:     p.date_label,
+        value:          p.value,
+        recorded_at:    p.recorded_at,
+      }));
+
+    if (toInsert.length > 0) {
+      const { error: histErr } = await supabase.from("biomarker_history").insert(toInsert);
+      if (histErr) return { error: histErr.message };
+    }
 
     revalidatePath("/exams");
     revalidatePath("/dashboard");

@@ -17,6 +17,7 @@ Para cada parâmetro encontrado, retorne:
 - ref_min: valor mínimo da faixa de referência do laboratório (null se não disponível no documento)
 - ref_max: valor máximo da faixa de referência do laboratório (null se não disponível no documento)
 - alterado: true se o valor está fora da faixa de referência, false se está dentro
+- historico: se o documento contiver tabela comparativa (ex: "LAUDO COMPARATIVO" com colunas de datas) ou gráficos com valores anteriores, extraia até 5 resultados anteriores no formato [{ "data": "YYYY-MM-DD", "valor": number }]. Na tabela comparativa, cada coluna é uma data e cada linha um parâmetro — associe o valor de cada coluna à data do cabeçalho daquela coluna; ignore células com "--". Use o 1º dia do mês quando a data for só mês/ano (ex: "Out/24" → "2024-10-01"). Array vazio [] se não houver histórico.
 
 Inclua absolutamente todos os parâmetros com resultado numérico. Não omita nenhum.
 
@@ -26,6 +27,7 @@ Além dos resultados, extraia também (se presentes no documento):
   crm e crm_uf podem ser null se não encontrados no documento.
 - laboratorio: { nome: string } — nome do laboratório (null se não encontrado)
 - data_exame: data do exame no formato "YYYY-MM-DD" (null se não encontrada)
+- paciente: { nome: string } — nome completo do paciente como aparece no exame (null se não encontrado)
 
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.`;
 
@@ -38,6 +40,7 @@ export type OCRResultado = {
   ref_min: number | null;
   ref_max: number | null;
   alterado: boolean;
+  historico?: { data: string; valor: number }[];
 };
 
 export type OCRMedico = { nome: string; crm: string | null; crm_uf: string | null };
@@ -47,10 +50,11 @@ export type OCRExamData = {
   medico_solicitante: OCRMedico | null;
   laboratorio: { nome: string } | null;
   data_exame: string | null;
+  paciente: { nome: string } | null;
 };
 
 function parseResponse(text: string): OCRExamData {
-  const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null };
+  const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null, paciente: null };
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) {
     console.log("[extract-exam] parseResponse: nenhum JSON encontrado no texto:", text.substring(0, 300));
@@ -69,7 +73,21 @@ function parseResponse(text: string): OCRExamData {
             ? parseFloat(item.valor)
             : null;
         if (typeof item.slug !== "string" || typeof item.nome !== "string" || valor === null || isNaN(valor)) return null;
-        return { ...item, valor } as OCRResultado;
+        const historico = Array.isArray(item.historico)
+          ? (item.historico as unknown[])
+              .map((h) => {
+                const hh = h as Record<string, unknown>;
+                const v = typeof hh.valor === "number"
+                  ? hh.valor
+                  : typeof hh.valor === "string"
+                    ? parseFloat(hh.valor.replace(",", "."))
+                    : NaN;
+                return typeof hh.data === "string" && !isNaN(v) ? { data: hh.data, valor: v } : null;
+              })
+              .filter((h): h is { data: string; valor: number } => h !== null)
+              .slice(0, 5)
+          : [];
+        return { ...item, valor, historico } as OCRResultado;
       })
       .filter((r: OCRResultado | null): r is OCRResultado => r !== null);
     console.log("[extract-exam] resultados parseados:", resultados.length);
@@ -79,7 +97,8 @@ function parseResponse(text: string): OCRExamData {
       : null;
     const lab = parsed.laboratorio?.nome ? { nome: parsed.laboratorio.nome } : null;
     const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;
-    return { resultados, medico_solicitante: medico, laboratorio: lab, data_exame: dataExame };
+    const paciente = parsed.paciente?.nome ? { nome: String(parsed.paciente.nome).trim() } : null;
+    return { resultados, medico_solicitante: medico, laboratorio: lab, data_exame: dataExame, paciente };
   } catch (e) {
     console.error("[extract-exam] parseResponse erro:", e);
     return empty;
@@ -99,9 +118,10 @@ async function extractPdfText(buffer: Buffer): Promise<string | null> {
   try {
     const { createRequire } = await import("module");
     const _require = createRequire(import.meta.url);
-    const pdfParse = _require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
-    const data = await pdfParse(buffer);
-    const cleaned = cleanPdfText(data.text ?? "");
+    const { PDFParse } = _require("pdf-parse") as typeof import("pdf-parse");
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const result = await parser.getText();
+    const cleaned = cleanPdfText(result.text ?? "");
     return cleaned.length > 200 ? cleaned : null;
   } catch {
     return null;
@@ -162,8 +182,10 @@ export async function POST(req: NextRequest) {
       const pdfText = await extractPdfText(buffer);
 
       if (pdfText) {
-        // PDF digital com texto selecionável — envia só o texto (limitado para caber no rate limit)
-        const truncated = pdfText.length > 12000 ? pdfText.substring(0, 12000) : pdfText;
+        // PDF digital com texto selecionável — envia o texto completo (até 120k chars). A tabela
+        // LAUDO COMPARATIVO de laudos Sabin/Fleury/DASA fica na última página (~75k chars num laudo
+        // de 49 páginas), então o limite precisa cobrir o documento inteiro para capturar o histórico.
+        const truncated = pdfText.length > 120000 ? pdfText.substring(0, 120000) : pdfText;
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",

@@ -138,6 +138,9 @@ export default async function DashboardPage() {
                     trend={b.trend}
                     category={b.category}
                     lastDate={b.last_date}
+                    slug={b.slug}
+                    history={(historyBySlug[b.slug] ?? []).map(h => ({ date: h.date_label, value: h.value }))}
+                    reference={b.reference as Record<string, number>}
                   />
                 ))}
               </MetricsGrid>
