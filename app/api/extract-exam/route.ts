@@ -27,6 +27,7 @@ Além dos resultados, extraia também (se presentes no documento):
   crm e crm_uf podem ser null se não encontrados no documento.
 - laboratorio: { nome: string } — nome do laboratório (null se não encontrado)
 - data_exame: data do exame no formato "YYYY-MM-DD" (null se não encontrada)
+- paciente: { nome: string } — nome completo do paciente como aparece no exame (null se não encontrado)
 
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.`;
 
@@ -49,10 +50,11 @@ export type OCRExamData = {
   medico_solicitante: OCRMedico | null;
   laboratorio: { nome: string } | null;
   data_exame: string | null;
+  paciente: { nome: string } | null;
 };
 
 function parseResponse(text: string): OCRExamData {
-  const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null };
+  const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null, paciente: null };
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) {
     console.log("[extract-exam] parseResponse: nenhum JSON encontrado no texto:", text.substring(0, 300));
@@ -89,7 +91,8 @@ function parseResponse(text: string): OCRExamData {
       : null;
     const lab = parsed.laboratorio?.nome ? { nome: parsed.laboratorio.nome } : null;
     const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;
-    return { resultados, medico_solicitante: medico, laboratorio: lab, data_exame: dataExame };
+    const paciente = parsed.paciente?.nome ? { nome: String(parsed.paciente.nome).trim() } : null;
+    return { resultados, medico_solicitante: medico, laboratorio: lab, data_exame: dataExame, paciente };
   } catch (e) {
     console.error("[extract-exam] parseResponse erro:", e);
     return empty;

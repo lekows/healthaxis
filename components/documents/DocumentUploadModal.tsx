@@ -24,12 +24,23 @@ function inferStatus(
   return "attention";
 }
 
-// ── Modal ────────────────────────────────────────────────────────────────────
-interface ModalProps { onClose: () => void; }
+function normalizeName(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
+}
 
-function DocumentUploadModalInner({ onClose }: ModalProps) {
+function namesMismatch(profileName: string, examName: string): boolean {
+  const profileWords = normalizeName(profileName).split(/\s+/).filter(w => w.length > 2);
+  const examNorm = normalizeName(examName);
+  return !profileWords.some(word => examNorm.includes(word));
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+interface ModalProps { onClose: () => void; userName?: string; }
+
+function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const router       = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingOcr   = useRef<OCRExamData | null>(null);
 
   const [inputMode, setInputMode]   = useState<"file" | "text">("file");
   const [file, setFile]             = useState<File | null>(null);
@@ -44,6 +55,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
   const [loading, setLoading]       = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError]           = useState<string | null>(null);
+  const [nameWarning, setNameWarning] = useState<string | null>(null);
 
   const handleFileChange = (f: File | null) => {
     if (!f) return;
@@ -62,11 +74,74 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
     handleFileChange(e.dataTransfer.files[0] ?? null);
   };
 
+  const saveOcrResults = async (data: OCRExamData) => {
+    if (data.medico_solicitante?.nome) {
+      await saveDoctor({
+        name: data.medico_solicitante.nome,
+        crm: data.medico_solicitante.crm ?? null,
+        crm_uf: data.medico_solicitante.crm_uf ?? null,
+        examDate: data.data_exame ?? date,
+      });
+    }
+
+    const resultados = data.resultados ?? [];
+    if (resultados.length === 0 && !data.medico_solicitante) {
+      setError(`Documento salvo. Resposta do Claude: vazia`);
+      setLoading(false);
+      router.refresh();
+      return;
+    }
+    if (resultados.length > 0) {
+      const bioResult = await saveExamBiomarkers(
+        resultados.map(r => ({
+          slug:      r.slug,
+          name:      r.nome,
+          category:  r.categoria ?? "Outros",
+          unit:      r.unidade   ?? "",
+          value:     r.valor,
+          reference: {
+            ...(r.ref_min !== null ? { min: r.ref_min } : {}),
+            ...(r.ref_max !== null ? { max: r.ref_max } : {}),
+          },
+          status:    inferStatus(r.valor, r.ref_min, r.ref_max, r.alterado),
+          historico: r.historico ?? [],
+        })),
+        date
+      );
+      if (bioResult?.error) {
+        setError(`Documento salvo. Erro ao registrar biomarcadores: ${bioResult.error}`);
+        setLoading(false);
+        router.refresh();
+        return;
+      }
+    }
+
+    router.refresh();
+    onClose();
+  };
+
+  const continueAfterWarning = async () => {
+    const data = pendingOcr.current;
+    if (!data) return;
+    pendingOcr.current = null;
+    setLoading(true);
+    setLoadingMsg("Salvando biomarcadores…");
+    try {
+      await saveOcrResults(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
+    } finally {
+      setLoading(false);
+      setLoadingMsg("");
+    }
+  };
+
   const handleSave = async () => {
     if (!title.trim()) { setError("Informe o título do documento."); return; }
     if (!lab.trim())   { setError("Informe o laboratório."); return; }
     setLoading(true);
     setError(null);
+    setNameWarning(null);
 
     try {
       // 1. Upload para Supabase Storage
@@ -109,7 +184,7 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
             fd.append("file", file!);
           }
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
-          const data: OCRExamData & { ocr_error?: string; _debug_raw?: string } = await res.json();
+          const data: OCRExamData & { ocr_error?: string } = await res.json();
 
           if (data.ocr_error) {
             setError(`Documento salvo. Falha na extração automática: ${data.ocr_error}`);
@@ -118,57 +193,28 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
             return;
           }
 
-          // Salva médico solicitante se encontrado (CRM é opcional)
-          if (data.medico_solicitante?.nome) {
-            await saveDoctor({
-              name: data.medico_solicitante.nome,
-              crm: data.medico_solicitante.crm ?? null,
-              crm_uf: data.medico_solicitante.crm_uf ?? null,
-              examDate: data.data_exame ?? date,
-            });
-          }
-
-          const resultados = data.resultados ?? [];
-          if (resultados.length === 0 && !data.medico_solicitante) {
-            setError(`Documento salvo. Resposta do Claude: ${data._debug_raw ?? "vazia"}`);
+          // 4. Verificação de nome do paciente
+          if (userName && data.paciente?.nome && namesMismatch(userName, data.paciente.nome)) {
+            pendingOcr.current = data;
+            setNameWarning(
+              `O exame parece ser de "${data.paciente.nome}". Seu perfil é "${userName}". Deseja salvar assim mesmo?`
+            );
             setLoading(false);
-            router.refresh();
+            setLoadingMsg("");
             return;
           }
-          if (resultados.length > 0) {
-            const bioResult = await saveExamBiomarkers(
-              resultados.map(r => ({
-                slug:      r.slug,
-                name:      r.nome,
-                category:  r.categoria ?? "Outros",
-                unit:      r.unidade   ?? "",
-                value:     r.valor,
-                reference: {
-                  ...(r.ref_min !== null ? { min: r.ref_min } : {}),
-                  ...(r.ref_max !== null ? { max: r.ref_max } : {}),
-                },
-                status:    inferStatus(r.valor, r.ref_min, r.ref_max, r.alterado),
-                historico: r.historico ?? [],
-              })),
-              date
-            );
-            if (bioResult?.error) {
-              setError(`Documento salvo. Erro ao registrar biomarcadores: ${bioResult.error}`);
-              setLoading(false);
-              router.refresh();
-              return;
-            }
-          }
+
+          await saveOcrResults(data);
         } catch (ocrErr) {
           setError(`Documento salvo. Erro na análise: ${ocrErr instanceof Error ? ocrErr.message : "tente novamente"}`);
           setLoading(false);
           router.refresh();
           return;
         }
+      } else {
+        router.refresh();
+        onClose();
       }
-
-      router.refresh();
-      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
     } finally {
@@ -309,6 +355,31 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
             </div>
           </div>
 
+          {/* Aviso de nome divergente */}
+          {nameWarning && (
+            <div className="p-4 rounded-2xl space-y-3"
+              style={{ background: "rgba(244,162,97,0.08)", border: "1px solid rgba(244,162,97,0.25)" }}>
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={15} style={{ color: "#F4A261", flexShrink: 0, marginTop: 1 }} />
+                <p className="text-sm" style={{ color: "#F4A261" }}>{nameWarning}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setNameWarning(null); continueAfterWarning(); }}
+                  className="flex-1 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-80"
+                  style={{ background: "rgba(244,162,97,0.15)", color: "#F4A261" }}>
+                  Salvar assim mesmo
+                </button>
+                <button
+                  onClick={() => { setNameWarning(null); pendingOcr.current = null; }}
+                  className="flex-1 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-80"
+                  style={{ background: "rgba(255,255,255,0.05)", color: "#9A9688" }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
               style={{ background: "rgba(193,68,14,0.08)", border: "1px solid rgba(193,68,14,0.2)", color: "#C1440E" }}>
@@ -331,9 +402,11 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
             className="text-sm disabled:opacity-40" style={{ color: "#5A5A50" }}>
             Cancelar
           </button>
-          <Button variant="primary" onClick={handleSave} disabled={loading}>
-            {loading ? loadingMsg || "Salvando…" : "Salvar"}
-          </Button>
+          {!nameWarning && (
+            <Button variant="primary" onClick={handleSave} disabled={loading}>
+              {loading ? loadingMsg || "Salvando…" : "Salvar"}
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -341,14 +414,14 @@ function DocumentUploadModalInner({ onClose }: ModalProps) {
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
-export function UploadDocumentButton() {
+export function UploadDocumentButton({ userName }: { userName?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button variant="primary" className="gap-2" onClick={() => setOpen(true)}>
         <Upload size={14} /> Adicionar documento
       </Button>
-      {open && <DocumentUploadModalInner onClose={() => setOpen(false)} />}
+      {open && <DocumentUploadModalInner onClose={() => setOpen(false)} userName={userName} />}
     </>
   );
 }
