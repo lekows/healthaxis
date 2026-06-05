@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getReference, inferStatus } from "@/lib/biomarker-references";
 
 type ActionResult = { error?: string };
 
@@ -61,8 +62,23 @@ export async function saveExamBiomarkers(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Sessão expirada." };
 
+    const { data: profile } = await supabase.from("profiles").select("sex, dob").eq("id", user.id).single();
+    const sex = (profile?.sex as string | null) ?? null;
+    const ageYears = profile?.dob
+      ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25 * 24 * 3600 * 1000))
+      : null;
+
+    const resolved = entries.map((e) => {
+      const staticRef = getReference(e.slug, sex, ageYears);
+      return {
+        ...e,
+        reference: staticRef ?? e.reference,
+        status:    staticRef ? inferStatus(e.value, staticRef) : e.status,
+      };
+    });
+
     const { error: upsertErr } = await supabase.from("biomarkers").upsert(
-      entries.map((e) => ({
+      resolved.map((e) => ({
         user_id:   user.id,
         slug:      e.slug,
         name:      e.name,
