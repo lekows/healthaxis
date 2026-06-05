@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 
+// Laudos grandes (49 páginas, ~56 biomarcadores com histórico) geram respostas longas
+// que levam dezenas de segundos — precisa de janela maior que o default da função.
+export const maxDuration = 60;
+
+// Output amplo: um laudo Sabin completo com histórico chega a ~10k tokens de JSON.
+// 8192 truncava a resposta no meio do JSON e o parse falhava ("resposta vazia").
+const MAX_OUTPUT_TOKENS = 16000;
+
 const SYSTEM = `Você é um extrator de resultados de exames laboratoriais.
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
 Use ponto como separador decimal.`;
@@ -53,6 +61,29 @@ export type OCRExamData = {
   paciente: { nome: string } | null;
 };
 
+// Recupera objetos {…} de nível superior de um array JSON possivelmente truncado
+// (quando a resposta do Claude excede max_tokens e o JSON fica incompleto no fim).
+function salvageObjects(arrText: string): unknown[] {
+  const objs: unknown[] = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < arrText.length; i++) {
+    const c = arrText[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{") { if (depth === 0) start = i; depth++; }
+    else if (c === "}" && depth > 0) {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        try { objs.push(JSON.parse(arrText.slice(start, i + 1))); } catch { /* objeto cortado no fim */ }
+        start = -1;
+      }
+    }
+  }
+  return objs;
+}
+
 function parseResponse(text: string): OCRExamData {
   const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null, paciente: null };
   const match = text.match(/\{[\s\S]*\}/);
@@ -60,49 +91,62 @@ function parseResponse(text: string): OCRExamData {
     console.log("[extract-exam] parseResponse: nenhum JSON encontrado no texto:", text.substring(0, 300));
     return empty;
   }
+
+  let parsed: Record<string, unknown>;
   try {
-    const parsed = JSON.parse(match[0]);
-    console.log("[extract-exam] resultados brutos:", JSON.stringify(parsed.resultados ?? []).substring(0, 500));
-    const resultados = (parsed.resultados ?? [])
-      .map((r: unknown) => {
-        if (typeof r !== "object" || r === null) return null;
-        const item = r as Record<string, unknown>;
-        const valor = typeof item.valor === "number"
-          ? item.valor
-          : typeof item.valor === "string"
-            ? parseFloat(item.valor)
-            : null;
-        if (typeof item.slug !== "string" || typeof item.nome !== "string" || valor === null || isNaN(valor)) return null;
-        const historico = Array.isArray(item.historico)
-          ? (item.historico as unknown[])
-              .map((h) => {
-                const hh = h as Record<string, unknown>;
-                const v = typeof hh.valor === "number"
-                  ? hh.valor
-                  : typeof hh.valor === "string"
-                    ? parseFloat(hh.valor.replace(",", "."))
-                    : NaN;
-                return typeof hh.data === "string" && !isNaN(v) ? { data: hh.data, valor: v } : null;
-              })
-              .filter((h): h is { data: string; valor: number } => h !== null)
-              .slice(0, 5)
-          : [];
-        return { ...item, valor, historico } as OCRResultado;
-      })
-      .filter((r: OCRResultado | null): r is OCRResultado => r !== null);
-    console.log("[extract-exam] resultados parseados:", resultados.length);
-    const med = parsed.medico_solicitante;
-    const medico = (med && typeof med.nome === "string" && med.nome.trim())
-      ? { nome: med.nome.trim(), crm: med.crm ?? null, crm_uf: med.crm_uf ?? null }
-      : null;
-    const lab = parsed.laboratorio?.nome ? { nome: parsed.laboratorio.nome } : null;
-    const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;
-    const paciente = parsed.paciente?.nome ? { nome: String(parsed.paciente.nome).trim() } : null;
-    return { resultados, medico_solicitante: medico, laboratorio: lab, data_exame: dataExame, paciente };
-  } catch (e) {
-    console.error("[extract-exam] parseResponse erro:", e);
-    return empty;
+    parsed = JSON.parse(match[0]);
+  } catch {
+    // Resposta truncada (output excedeu max_tokens) — recupera os biomarcadores completos.
+    const key = text.indexOf('"resultados"');
+    const arrStart = key >= 0 ? text.indexOf("[", key) : -1;
+    const salvaged = arrStart >= 0 ? salvageObjects(text.slice(arrStart)) : [];
+    if (salvaged.length === 0) {
+      console.log("[extract-exam] parseResponse: JSON truncado e nada recuperável");
+      return empty;
+    }
+    console.log(`[extract-exam] parseResponse: JSON truncado, ${salvaged.length} resultados recuperados`);
+    parsed = { resultados: salvaged };
   }
+
+  const resultados = ((parsed.resultados as unknown[]) ?? [])
+    .map((r: unknown) => {
+      if (typeof r !== "object" || r === null) return null;
+      const item = r as Record<string, unknown>;
+      const valor = typeof item.valor === "number"
+        ? item.valor
+        : typeof item.valor === "string"
+          ? parseFloat(item.valor)
+          : null;
+      if (typeof item.slug !== "string" || typeof item.nome !== "string" || valor === null || isNaN(valor)) return null;
+      const historico = Array.isArray(item.historico)
+        ? (item.historico as unknown[])
+            .map((h) => {
+              const hh = h as Record<string, unknown>;
+              const v = typeof hh.valor === "number"
+                ? hh.valor
+                : typeof hh.valor === "string"
+                  ? parseFloat(hh.valor.replace(",", "."))
+                  : NaN;
+              return typeof hh.data === "string" && !isNaN(v) ? { data: hh.data, valor: v } : null;
+            })
+            .filter((h): h is { data: string; valor: number } => h !== null)
+            .slice(0, 5)
+        : [];
+      return { ...item, valor, historico } as OCRResultado;
+    })
+    .filter((r: OCRResultado | null): r is OCRResultado => r !== null);
+  console.log("[extract-exam] resultados parseados:", resultados.length);
+
+  const med = parsed.medico_solicitante as Record<string, unknown> | null | undefined;
+  const medico = (med && typeof med.nome === "string" && med.nome.trim())
+    ? { nome: med.nome.trim(), crm: (med.crm as string | null) ?? null, crm_uf: (med.crm_uf as string | null) ?? null }
+    : null;
+  const lab = parsed.laboratorio as { nome?: unknown } | null | undefined;
+  const laboratorio = lab && typeof lab.nome === "string" ? { nome: lab.nome } : null;
+  const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;
+  const pac = parsed.paciente as { nome?: unknown } | null | undefined;
+  const paciente = pac && pac.nome ? { nome: String(pac.nome).trim() } : null;
+  return { resultados, medico_solicitante: medico, laboratorio, data_exame: dataExame, paciente };
 }
 
 function cleanPdfText(raw: string): string {
@@ -154,7 +198,7 @@ export async function POST(req: NextRequest) {
       console.log(`[extract-exam] Texto colado (${pastedText.length} chars). Usando texto direto.`);
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 8192,
+        max_tokens: MAX_OUTPUT_TOKENS,
         system: SYSTEM,
         messages: [{ role: "user", content: `${PROMPT_BASE}\n\n---\n\n${truncated}` }],
       });
@@ -189,7 +233,7 @@ export async function POST(req: NextRequest) {
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 8192,
+          max_tokens: MAX_OUTPUT_TOKENS,
           system: SYSTEM,
           messages: [{
             role: "user",
@@ -204,7 +248,7 @@ export async function POST(req: NextRequest) {
         const base64 = buffer.toString("base64");
         const msg = await client.beta.messages.create({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 8192,
+          max_tokens: MAX_OUTPUT_TOKENS,
           betas: ["pdfs-2024-09-25"],
           system: SYSTEM,
           messages: [{
@@ -228,7 +272,7 @@ export async function POST(req: NextRequest) {
 
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 8192,
+        max_tokens: MAX_OUTPUT_TOKENS,
         system: SYSTEM,
         messages: [{
           role: "user",
