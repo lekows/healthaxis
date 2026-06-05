@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui";
 import { HoverCard, AnimatedProgressBar, StaggerContainer, StaggerItem, fadeUp } from "@/lib/motion";
 import { getBiomarkerColor, getBiomarkerLabel } from "@/lib/utils";
+import { getBiomarkerInfo } from "@/lib/biomarker-references";
 
 // ── helpers ────────────────────────────────────────────
 type HistoryPoint = { date: string; value: number };
@@ -84,20 +85,6 @@ function PeriodTabs({ value, onChange }: { value: Period; onChange: (p: Period) 
   );
 }
 
-// ── Biomarker descriptions ─────────────────────────────
-const BIOMARKER_INFO: Record<string, string> = {
-  "ldl-colesterol": "Colesterol 'ruim' — níveis altos entopem artérias e aumentam o risco de infarto e AVC.",
-  "hdl-colesterol": "Colesterol 'bom' — protege o coração removendo gordura das artérias. Quanto maior, melhor.",
-  "triglicerides": "Gordura no sangue — valores altos aumentam risco cardíaco e indicam excesso de açúcar ou álcool na dieta.",
-  "glicemia": "Açúcar no sangue em jejum — indicador precoce de pré-diabetes e resistência à insulina.",
-  "hemoglobina-glicada": "Média do açúcar nos últimos 3 meses — essencial para controle e diagnóstico do diabetes.",
-  "vitamina-d": "Regula imunidade, ossos e humor — deficiência é silenciosa, muito comum e fácil de corrigir.",
-  "tsh": "Controla a tireoide, que regula metabolismo, energia e temperatura corporal.",
-  "hemoglobina": "Transporta oxigênio no sangue — valores baixos causam cansaço e indicam anemia.",
-  "creatinina": "Resíduo muscular filtrado pelos rins — valor elevado pode sinalizar sobrecarga ou lesão renal.",
-  "vitamina-b12": "Essencial para neurônios e glóbulos vermelhos — deficiência causa fadiga e formigamentos.",
-};
-
 // ── BiomarkerDetailModal ───────────────────────────────
 interface DetailModalProps {
   name: string; value: number; unit: string; status: string;
@@ -108,7 +95,7 @@ interface DetailModalProps {
 function BiomarkerDetailModal({ name, value, unit, status, history, reference, slug, onClose }: DetailModalProps) {
   const [period, setPeriod] = useState<Period>("all");
   const color = getBiomarkerColor(status);
-  const info = slug ? BIOMARKER_INFO[slug] : undefined;
+  const info = slug ? getBiomarkerInfo(slug) : undefined;
   const refMin = reference?.min;
   const refMax = reference?.max;
   const filtered = filterByPeriod(history, period);
