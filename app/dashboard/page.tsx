@@ -121,25 +121,29 @@ export default async function DashboardPage() {
             action={{ label: "Enviar primeiro exame", href: "/documents" }}
           />
         )}
-        {biomarkers.length > 0 && (
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Biomarcadores principais</h2>
-            <MetricsGrid className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {biomarkers.map(b => (
-                <HealthMetricCard
-                  key={b.id}
-                  name={b.name}
-                  value={b.value}
-                  unit={b.unit}
-                  status={b.status}
-                  trend={b.trend}
-                  category={b.category}
-                  lastDate={b.last_date}
-                />
-              ))}
-            </MetricsGrid>
-          </div>
-        )}
+        {biomarkers.length > 0 && (() => {
+          const statusOrder: Record<string, number> = { critical: 0, high: 1, low: 1, attention: 2, optimal: 3 };
+          const sorted = [...biomarkers].sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4));
+          return (
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Biomarcadores principais</h2>
+              <MetricsGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sorted.map(b => (
+                  <HealthMetricCard
+                    key={b.id}
+                    name={b.name}
+                    value={b.value}
+                    unit={b.unit}
+                    status={b.status}
+                    trend={b.trend}
+                    category={b.category}
+                    lastDate={b.last_date}
+                  />
+                ))}
+              </MetricsGrid>
+            </div>
+          );
+        })()}
 
         {/* Tendências — mostra os mais relevantes (alterados primeiro) */}
         {Object.keys(historyBySlug).length > 0 && (() => {

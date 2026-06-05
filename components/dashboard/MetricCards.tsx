@@ -328,9 +328,9 @@ export function BiomarkerTrendCard({ name, value, unit, status, history, referen
           <PeriodTabs value={period} onChange={setPeriod} />
         </div>
 
-        <div className="h-32">
+        <div className="h-32 overflow-hidden">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={filtered} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+            <LineChart data={filtered} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
               {refMin !== undefined && refMax !== undefined && (
                 <ReferenceArea y1={refMin} y2={refMax} fill="#52B788" fillOpacity={0.08} />
               )}
