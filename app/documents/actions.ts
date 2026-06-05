@@ -96,32 +96,41 @@ export async function saveExamBiomarkers(
     if (upsertErr) return { error: upsertErr.message };
 
     const dateLabel = toDateLabel(examDate);
-    const { error: histErr } = await supabase.from("biomarker_history").upsert(
-      entries.map((e) => ({
-        user_id:        user.id,
-        biomarker_slug: e.slug,
-        date_label:     dateLabel,
-        value:          e.value,
-        recorded_at:    examDate,
-      })),
-      { onConflict: "user_id,biomarker_slug,recorded_at", ignoreDuplicates: true }
-    );
-    if (histErr) return { error: histErr.message };
+    const allPoints = [
+      ...entries.map((e) => ({ slug: e.slug, recorded_at: examDate, date_label: dateLabel, value: e.value })),
+      ...entries.flatMap((e) =>
+        (e.historico ?? []).map((h) => ({
+          slug: e.slug, recorded_at: h.data, date_label: toDateLabel(h.data), value: h.valor,
+        }))
+      ),
+    ];
 
-    const historicEntries = entries.flatMap(e =>
-      (e.historico ?? []).map(h => ({
+    // Dedup sem depender de unique constraint no banco: busca pontos já gravados e
+    // insere só os que faltam. Idempotente — reenviar o mesmo laudo não duplica.
+    const { data: existing } = await supabase
+      .from("biomarker_history")
+      .select("biomarker_slug, recorded_at")
+      .eq("user_id", user.id);
+    const seen = new Set((existing ?? []).map((r) => `${r.biomarker_slug}|${r.recorded_at}`));
+
+    const toInsert = allPoints
+      .filter((p) => {
+        const key = `${p.slug}|${p.recorded_at}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((p) => ({
         user_id:        user.id,
-        biomarker_slug: e.slug,
-        date_label:     toDateLabel(h.data),
-        value:          h.valor,
-        recorded_at:    h.data,
-      }))
-    );
-    if (historicEntries.length > 0) {
-      await supabase.from("biomarker_history").upsert(
-        historicEntries,
-        { onConflict: "user_id,biomarker_slug,recorded_at", ignoreDuplicates: true }
-      );
+        biomarker_slug: p.slug,
+        date_label:     p.date_label,
+        value:          p.value,
+        recorded_at:    p.recorded_at,
+      }));
+
+    if (toInsert.length > 0) {
+      const { error: histErr } = await supabase.from("biomarker_history").insert(toInsert);
+      if (histErr) return { error: histErr.message };
     }
 
     revalidatePath("/exams");
