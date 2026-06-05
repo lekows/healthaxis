@@ -6,6 +6,7 @@ import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore, getDoctors } from "@/lib/supabase/queries";
 import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical, Stethoscope } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { Card, Badge } from "@/components/ui";
 
 export default async function DashboardPage() {
   const [profile, biomarkers, history, documents, reminders, healthScore, doctors] = await Promise.all([
@@ -112,7 +113,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Biomarcadores */}
+        {/* Biomarcadores — mesmo padrão da página /exams */}
         {biomarkers.length === 0 && (
           <EmptyState
             icon={FlaskConical}
@@ -123,53 +124,42 @@ export default async function DashboardPage() {
         )}
         {biomarkers.length > 0 && (() => {
           const statusOrder: Record<string, number> = { critical: 0, high: 1, low: 1, attention: 2, optimal: 3 };
+          const statusColor = (s: string) => s === "optimal" ? "#52B788" : s === "attention" ? "#F4A261" : "#C1440E";
           const sorted = [...biomarkers].sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4));
           return (
             <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Biomarcadores principais</h2>
-              <MetricsGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {sorted.map(b => (
-                  <HealthMetricCard
-                    key={b.id}
-                    name={b.name}
-                    value={b.value}
-                    unit={b.unit}
-                    status={b.status}
-                    trend={b.trend}
-                    category={b.category}
-                    lastDate={b.last_date}
-                  />
-                ))}
-              </MetricsGrid>
-            </div>
-          );
-        })()}
-
-        {/* Tendências — mostra os mais relevantes (alterados primeiro) */}
-        {Object.keys(historyBySlug).length > 0 && (() => {
-          const statusOrder: Record<string, number> = { critical: 0, high: 1, low: 1, attention: 2, optimal: 3 };
-          const trendBiomarkers = biomarkers
-            .filter(bm => historyBySlug[bm.slug]?.length > 0)
-            .sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4))
-            .slice(0, 4);
-          if (!trendBiomarkers.length) return null;
-          return (
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Tendências</h2>
-              <MetricsGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {trendBiomarkers.map(bm => (
-                  <BiomarkerTrendCard
-                    key={bm.slug}
-                    slug={bm.slug}
-                    name={bm.name}
-                    value={Number(bm.value)}
-                    unit={bm.unit}
-                    status={bm.status}
-                    history={historyBySlug[bm.slug].map(h => ({ date: h.date_label, value: h.value }))}
-                    reference={bm.reference as Record<string, number>}
-                  />
-                ))}
-              </MetricsGrid>
+              <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Biomarcadores</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sorted.map(b => {
+                  const hist = historyBySlug[b.slug];
+                  if (hist?.length) {
+                    return (
+                      <BiomarkerTrendCard
+                        key={b.id}
+                        slug={b.slug}
+                        name={b.name}
+                        value={Number(b.value)}
+                        unit={b.unit}
+                        status={b.status}
+                        history={hist.map(h => ({ date: h.date_label, value: h.value }))}
+                        reference={b.reference as Record<string, number>}
+                      />
+                    );
+                  }
+                  return (
+                    <Card key={b.id} className="p-5">
+                      <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{b.name}</p>
+                      <div className="flex items-end gap-1 mt-2 mb-3">
+                        <span className="text-2xl font-bold" style={{ color: statusColor(b.status) }}>{b.value}</span>
+                        <span className="text-xs mb-1" style={{ color: "#5A5A50" }}>{b.unit}</span>
+                      </div>
+                      <Badge variant={b.status === "optimal" ? "success" : b.status === "attention" ? "warning" : "danger"}>
+                        {b.status === "optimal" ? "Ótimo" : b.status === "attention" ? "Atenção" : "Risco"}
+                      </Badge>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           );
         })()}
