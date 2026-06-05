@@ -17,7 +17,7 @@ Para cada parâmetro encontrado, retorne:
 - ref_min: valor mínimo da faixa de referência do laboratório (null se não disponível no documento)
 - ref_max: valor máximo da faixa de referência do laboratório (null se não disponível no documento)
 - alterado: true se o valor está fora da faixa de referência, false se está dentro
-- historico: se o documento contiver tabela comparativa ou gráficos com valores anteriores, extraia até 3 resultados anteriores no formato [{ "data": "YYYY-MM-DD", "valor": number }]. Use o 1º dia do mês quando a data for só mês/ano (ex: "Out/24" → "2024-10-01"). Array vazio [] se não houver histórico.
+- historico: se o documento contiver tabela comparativa (ex: "LAUDO COMPARATIVO" com colunas de datas) ou gráficos com valores anteriores, extraia até 5 resultados anteriores no formato [{ "data": "YYYY-MM-DD", "valor": number }]. Na tabela comparativa, cada coluna é uma data e cada linha um parâmetro — associe o valor de cada coluna à data do cabeçalho daquela coluna; ignore células com "--". Use o 1º dia do mês quando a data for só mês/ano (ex: "Out/24" → "2024-10-01"). Array vazio [] se não houver histórico.
 
 Inclua absolutamente todos os parâmetros com resultado numérico. Não omita nenhum.
 
@@ -75,11 +75,17 @@ function parseResponse(text: string): OCRExamData {
         if (typeof item.slug !== "string" || typeof item.nome !== "string" || valor === null || isNaN(valor)) return null;
         const historico = Array.isArray(item.historico)
           ? (item.historico as unknown[])
-              .filter((h): h is { data: string; valor: number } =>
-                typeof (h as Record<string, unknown>).data === "string" &&
-                typeof (h as Record<string, unknown>).valor === "number"
-              )
-              .slice(0, 3)
+              .map((h) => {
+                const hh = h as Record<string, unknown>;
+                const v = typeof hh.valor === "number"
+                  ? hh.valor
+                  : typeof hh.valor === "string"
+                    ? parseFloat(hh.valor.replace(",", "."))
+                    : NaN;
+                return typeof hh.data === "string" && !isNaN(v) ? { data: hh.data, valor: v } : null;
+              })
+              .filter((h): h is { data: string; valor: number } => h !== null)
+              .slice(0, 5)
           : [];
         return { ...item, valor, historico } as OCRResultado;
       })
@@ -112,9 +118,10 @@ async function extractPdfText(buffer: Buffer): Promise<string | null> {
   try {
     const { createRequire } = await import("module");
     const _require = createRequire(import.meta.url);
-    const pdfParse = _require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
-    const data = await pdfParse(buffer);
-    const cleaned = cleanPdfText(data.text ?? "");
+    const { PDFParse } = _require("pdf-parse") as typeof import("pdf-parse");
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const result = await parser.getText();
+    const cleaned = cleanPdfText(result.text ?? "");
     return cleaned.length > 200 ? cleaned : null;
   } catch {
     return null;
@@ -175,9 +182,10 @@ export async function POST(req: NextRequest) {
       const pdfText = await extractPdfText(buffer);
 
       if (pdfText) {
-        // PDF digital com texto selecionável — envia o texto completo (até 50k chars para capturar
-        // históricos e tabela comparativa em laudos de múltiplas páginas como Sabin/Fleury)
-        const truncated = pdfText.length > 50000 ? pdfText.substring(0, 50000) : pdfText;
+        // PDF digital com texto selecionável — envia o texto completo (até 120k chars). A tabela
+        // LAUDO COMPARATIVO de laudos Sabin/Fleury/DASA fica na última página (~75k chars num laudo
+        // de 49 páginas), então o limite precisa cobrir o documento inteiro para capturar o histórico.
+        const truncated = pdfText.length > 120000 ? pdfText.substring(0, 120000) : pdfText;
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
