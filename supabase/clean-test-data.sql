@@ -1,17 +1,20 @@
--- Guia para limpar dados de exames incorretos enviados durante testes.
--- Execute cada bloco separadamente no SQL Editor do Supabase.
+-- Limpa dados de exames incorretos enviados durante testes.
+-- Substitua o email abaixo pelo seu email de cadastro e execute tudo de uma vez.
 
--- PASSO 1: Encontre seu user_id (substitua pelo seu email)
-SELECT id, email FROM auth.users WHERE email = 'seu@email.com';
+DO $$
+DECLARE
+  uid uuid;
+BEGIN
+  SELECT id INTO uid FROM auth.users WHERE email = 'leonardo.karino@gmail.com';
 
--- PASSO 2: Com o id do passo anterior, apague o histórico de biomarcadores
-DELETE FROM biomarker_history WHERE user_id = '<cole-seu-user-id-aqui>';
+  IF uid IS NULL THEN
+    RAISE EXCEPTION 'Usuário não encontrado. Verifique o email.';
+  END IF;
 
--- PASSO 3: Apague os biomarcadores
-DELETE FROM biomarkers WHERE user_id = '<cole-seu-user-id-aqui>';
+  DELETE FROM biomarker_history WHERE user_id = uid;
+  DELETE FROM biomarkers        WHERE user_id = uid;
+  DELETE FROM documents         WHERE user_id = uid;
+  DELETE FROM doctors           WHERE user_id = uid;
 
--- PASSO 4: (Opcional) Apague os documentos para re-enviar tudo do zero
-DELETE FROM documents WHERE user_id = '<cole-seu-user-id-aqui>';
-
--- PASSO 5: (Opcional) Apague médicos extraídos incorretamente
-DELETE FROM doctors WHERE user_id = '<cole-seu-user-id-aqui>';
+  RAISE NOTICE 'Dados limpos para o usuário %', uid;
+END $$;
