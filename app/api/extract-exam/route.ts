@@ -177,22 +177,26 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const form = await req.formData();
-  const pastedText = form.get("text") as string | null;
-  const file = form.get("file") as File | null;
+  try {
+    const form = await req.formData();
+    const pastedText = form.get("text") as string | null;
+    const file = form.get("file") as File | null;
+    // Laudos > 4.5 MB estouram o limite de body do Vercel se enviados crus. O arquivo
+    // já está no Supabase Storage, então o cliente manda a URL e nós baixamos aqui.
+    const fileUrl = form.get("file_url") as string | null;
+    const fileType = form.get("file_type") as string | null;
 
-  if (!file && !pastedText) return NextResponse.json({ error: "Arquivo ou texto ausente" }, { status: 400 });
-  if (file && file.size > 8 * 1024 * 1024) {
-    return NextResponse.json({ error: "Arquivo muito grande (máx 8 MB)" }, { status: 413 });
-  }
+    if (!file && !pastedText && !fileUrl) return NextResponse.json({ error: "Arquivo ou texto ausente" }, { status: 400 });
+    if (file && file.size > 8 * 1024 * 1024) {
+      return NextResponse.json({ error: "Arquivo muito grande (máx 8 MB)" }, { status: 413 });
+    }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ resultados: [], ocr_error: "Serviço de análise não configurado." });
-  }
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ resultados: [], ocr_error: "Serviço de análise não configurado." });
+    }
 
-  // Texto colado pelo usuário — caminho direto, zero tokens de ruído de PDF
-  if (pastedText && pastedText.trim().length > 10) {
-    try {
+    // Texto colado pelo usuário — caminho direto, zero tokens de ruído de PDF
+    if (pastedText && pastedText.trim().length > 10) {
       const client = new Anthropic();
       const truncated = pastedText.length > 12000 ? pastedText.substring(0, 12000) : pastedText;
       console.log(`[extract-exam] Texto colado (${pastedText.length} chars). Usando texto direto.`);
@@ -206,18 +210,25 @@ export async function POST(req: NextRequest) {
       const responseText = block.type === "text" ? block.text : "";
       const examData = parseResponse(responseText);
       return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 4000) });
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      const isRateLimit = raw.includes("rate_limit") || raw.includes("429");
-      return NextResponse.json({ resultados: [], ocr_error: isRateLimit ? "Limite de requisições atingido. Aguarde 1 minuto e tente novamente." : raw });
     }
-  }
 
-  const bytes = await file!.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const isPDF = file!.type === "application/pdf";
+    const imageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    let buffer: Buffer;
+    let isPDF: boolean;
+    let imageMediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/jpeg";
 
-  try {
+    if (fileUrl) {
+      const resp = await fetch(fileUrl);
+      if (!resp.ok) return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
+      buffer = Buffer.from(await resp.arrayBuffer());
+      isPDF = fileType === "application/pdf" || fileUrl.toLowerCase().split("?")[0].endsWith(".pdf");
+      if (fileType && imageTypes.includes(fileType)) imageMediaType = fileType as typeof imageMediaType;
+    } else {
+      buffer = Buffer.from(await file!.arrayBuffer());
+      isPDF = file!.type === "application/pdf";
+      if (imageTypes.includes(file!.type)) imageMediaType = file!.type as typeof imageMediaType;
+    }
+
     const client = new Anthropic();
     let responseText = "";
 
@@ -265,11 +276,6 @@ export async function POST(req: NextRequest) {
     } else {
       // Imagem (JPG, PNG, WebP)
       const base64 = buffer.toString("base64");
-      const mediaType = (
-        ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file!.type)
-          ? file!.type : "image/jpeg"
-      ) as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: MAX_OUTPUT_TOKENS,
@@ -277,7 +283,7 @@ export async function POST(req: NextRequest) {
         messages: [{
           role: "user",
           content: [
-            { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+            { type: "image", source: { type: "base64", media_type: imageMediaType, data: base64 } },
             { type: "text", text: PROMPT_BASE },
           ],
         }],
