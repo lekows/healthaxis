@@ -21,7 +21,11 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError("E-mail ou senha incorretos.");
+      if (error.message.includes("Email not confirmed")) {
+        setError("Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.");
+      } else {
+        setError("E-mail ou senha incorretos.");
+      }
       setLoading(false);
       return;
     }

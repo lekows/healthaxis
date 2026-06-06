@@ -6,6 +6,15 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { seedUserData, updateUserRole } from "@/app/auth/actions";
 
+function translateError(msg: string): string {
+  if (msg.includes("Password should be at least")) return "A senha deve ter pelo menos 6 caracteres.";
+  if (msg.includes("already registered") || msg.includes("already been registered")) return "Este e-mail já está cadastrado.";
+  if (msg.includes("rate limit")) return "Muitas tentativas. Tente novamente em alguns minutos.";
+  if (msg.includes("Unable to validate email")) return "E-mail inválido.";
+  if (msg.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
+  return msg;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [role, setRole] = useState<"patient" | "doctor">("patient");
@@ -15,6 +24,7 @@ export default function SignupPage() {
   const [crm, setCrm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -22,29 +32,35 @@ export default function SignupPage() {
     setError("");
 
     const supabase = createClient();
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name, role, crm: crm || null } },
     });
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(translateError(signUpError.message));
       setLoading(false);
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await updateUserRole(user.id, role, crm || undefined);
-      if (role === "patient") {
-        await seedUserData(user.id);
-        router.push("/dashboard");
-      } else {
-        router.push("/doctor/setup");
-      }
-      router.refresh();
+    // Supabase requires email confirmation — session is null until confirmed
+    if (!signUpData.session) {
+      setConfirmationSent(true);
+      setLoading(false);
+      return;
     }
+
+    // Immediately authenticated (email confirmation disabled)
+    const userId = signUpData.user!.id;
+    await updateUserRole(userId, role, crm || undefined);
+    if (role === "patient") {
+      await seedUserData(userId);
+      router.push("/dashboard");
+    } else {
+      router.push("/doctor/setup");
+    }
+    router.refresh();
   }
 
   async function handleGoogleSignup() {
@@ -53,6 +69,28 @@ export default function SignupPage() {
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
+  }
+
+  if (confirmationSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0D0D0B" }}>
+        <div className="w-full max-w-md px-8 py-10 rounded-2xl border border-white/10 text-center" style={{ background: "#161614" }}>
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+            style={{ background: "rgba(82,183,136,0.12)", border: "1px solid rgba(82,183,136,0.2)" }}>
+            <svg className="w-5 h-5" fill="none" stroke="#52B788" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-white mb-2">Confirme seu e-mail</h2>
+          <p className="text-sm text-white/40 mb-6">
+            Enviamos um link de confirmação para <span className="text-white/70">{email}</span>. Clique no link para ativar sua conta.
+          </p>
+          <Link href="/auth/login" className="text-sm text-white/50 hover:text-white transition-colors">
+            Voltar ao login
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
