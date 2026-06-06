@@ -115,13 +115,20 @@ returns table (
   specialty   text
 )
 language sql security definer as $$
-  select prof.id, prof.name, dp.crm, dp.crm_uf, dp.specialty
-  from   public.doctor_invites inv
-  join   public.profiles prof      on prof.id = inv.doctor_id
-  join   public.doctor_profiles dp on dp.id   = inv.doctor_id
-  where  inv.token = p_token
-    and  inv.expires_at > now()
-    and  inv.used_at is null;
+  select
+    profiles.id,
+    profiles.name,
+    doctor_profiles.crm,
+    doctor_profiles.crm_uf,
+    doctor_profiles.specialty
+  from public.doctor_invites
+  join public.profiles
+    on profiles.id = doctor_invites.doctor_id
+  join public.doctor_profiles
+    on doctor_profiles.id = doctor_invites.doctor_id
+  where doctor_invites.token = p_token
+    and doctor_invites.expires_at > now()
+    and doctor_invites.used_at is null;
 $$;
 
 create or replace function public.resolve_shared_token(p_token text)
@@ -132,12 +139,17 @@ returns table (
   expires_at   timestamptz
 )
 language sql security definer as $$
-  select s.patient_id, prof.name, s.document_ids, s.expires_at
-  from   public.shared_exam_tokens s
-  join   public.profiles prof on prof.id = s.patient_id
-  where  s.token = p_token
-    and  s.expires_at > now()
-    and  s.revoked_at is null;
+  select
+    shared_exam_tokens.patient_id,
+    profiles.name,
+    shared_exam_tokens.document_ids,
+    shared_exam_tokens.expires_at
+  from public.shared_exam_tokens
+  join public.profiles
+    on profiles.id = shared_exam_tokens.patient_id
+  where shared_exam_tokens.token = p_token
+    and shared_exam_tokens.expires_at > now()
+    and shared_exam_tokens.revoked_at is null;
 $$;
 
 -- ── Grants ───────────────────────────────────────────────────────────────────
