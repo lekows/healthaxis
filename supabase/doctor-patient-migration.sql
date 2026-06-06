@@ -115,13 +115,13 @@ returns table (
   specialty   text
 )
 language sql security definer as $$
-  select p.id, p.name, dp.crm, dp.crm_uf, dp.specialty
-  from   public.doctor_invites i
-  join   public.profiles p     on p.id  = i.doctor_id
-  join   public.doctor_profiles dp on dp.id = i.doctor_id
-  where  i.token = p_token
-    and  i.expires_at > now()
-    and  i.used_at is null;
+  select prof.id, prof.name, dp.crm, dp.crm_uf, dp.specialty
+  from   public.doctor_invites inv
+  join   public.profiles prof      on prof.id = inv.doctor_id
+  join   public.doctor_profiles dp on dp.id   = inv.doctor_id
+  where  inv.token = p_token
+    and  inv.expires_at > now()
+    and  inv.used_at is null;
 $$;
 
 create or replace function public.resolve_shared_token(p_token text)
@@ -132,9 +132,9 @@ returns table (
   expires_at   timestamptz
 )
 language sql security definer as $$
-  select s.patient_id, p.name, s.document_ids, s.expires_at
+  select s.patient_id, prof.name, s.document_ids, s.expires_at
   from   public.shared_exam_tokens s
-  join   public.profiles p on p.id = s.patient_id
+  join   public.profiles prof on prof.id = s.patient_id
   where  s.token = p_token
     and  s.expires_at > now()
     and  s.revoked_at is null;
