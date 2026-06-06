@@ -153,56 +153,59 @@ function BiomarkerDetailModal({ name, value, unit, status, history, reference, s
             </div>
           )}
 
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { label: "Mínimo", val: stats.min },
-              { label: "Médio", val: stats.avg },
-              { label: "Máximo", val: stats.max },
-              { label: "Variação", val: stats.delta, prefix: stats.delta > 0 ? "+" : "" },
-            ].map(s => (
-              <div key={s.label} className="p-3 rounded-2xl text-center"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <p className="text-xs mb-1" style={{ color: "#5A5A50" }}>{s.label}</p>
-                <p className="text-sm font-bold" style={{
-                  color: s.prefix !== undefined && s.val !== 0 ? (s.val > 0 ? "#F4A261" : "#52B788") : "#E8E4D9"
-                }}>
-                  {s.prefix ?? ""}{s.val}
-                </p>
+          {/* Stats + Chart — só quando há histórico */}
+          {history.length > 0 && (
+            <>
+              <div className="grid grid-cols-4 gap-3">
+                {[
+                  { label: "Mínimo", val: stats.min },
+                  { label: "Médio", val: stats.avg },
+                  { label: "Máximo", val: stats.max },
+                  { label: "Variação", val: stats.delta, prefix: stats.delta > 0 ? "+" : "" },
+                ].map(s => (
+                  <div key={s.label} className="p-3 rounded-2xl text-center"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <p className="text-xs mb-1" style={{ color: "#5A5A50" }}>{s.label}</p>
+                    <p className="text-sm font-bold" style={{
+                      color: s.prefix !== undefined && s.val !== 0 ? (s.val > 0 ? "#F4A261" : "#52B788") : "#E8E4D9"
+                    }}>
+                      {s.prefix ?? ""}{s.val}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          {/* Period + Chart */}
-          <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-medium" style={{ color: "#9A9688" }}>{filtered.length} medições</p>
-              <PeriodTabs value={period} onChange={setPeriod} />
-            </div>
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={filtered} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4" />
-                  {refMin !== undefined && refMax !== undefined && (
-                    <ReferenceArea y1={refMin} y2={refMax} fill="#52B788" fillOpacity={0.07} />
-                  )}
-                  {refMax !== undefined && (
-                    <ReferenceLine y={refMax} stroke="#F4A261" strokeDasharray="4 3" strokeOpacity={0.5} strokeWidth={1} />
-                  )}
-                  {refMin !== undefined && (
-                    <ReferenceLine y={refMin} stroke="#F4A261" strokeDasharray="4 3" strokeOpacity={0.5} strokeWidth={1} />
-                  )}
-                  <XAxis dataKey="date" tick={{ fill: "#5A5A50", fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                  <YAxis domain={[yMin, yMax]} tick={{ fill: "#5A5A50", fontSize: 9 }} tickLine={false} axisLine={false} width={32} />
-                  <Tooltip content={<DarkTooltip unit={unit} refMin={refMin} refMax={refMax} />} />
-                  <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5}
-                    dot={{ r: 3, fill: color, strokeWidth: 0 }}
-                    activeDot={{ r: 5, fill: color, stroke: "#0D0D0B", strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+              <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-xs font-medium" style={{ color: "#9A9688" }}>{filtered.length} medições</p>
+                  <PeriodTabs value={period} onChange={setPeriod} />
+                </div>
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={filtered} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4" />
+                      {refMin !== undefined && refMax !== undefined && (
+                        <ReferenceArea y1={refMin} y2={refMax} fill="#52B788" fillOpacity={0.07} />
+                      )}
+                      {refMax !== undefined && (
+                        <ReferenceLine y={refMax} stroke="#F4A261" strokeDasharray="4 3" strokeOpacity={0.5} strokeWidth={1} />
+                      )}
+                      {refMin !== undefined && (
+                        <ReferenceLine y={refMin} stroke="#F4A261" strokeDasharray="4 3" strokeOpacity={0.5} strokeWidth={1} />
+                      )}
+                      <XAxis dataKey="date" tick={{ fill: "#5A5A50", fontSize: 9 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                      <YAxis domain={[yMin, yMax]} tick={{ fill: "#5A5A50", fontSize: 9 }} tickLine={false} axisLine={false} width={32} />
+                      <Tooltip content={<DarkTooltip unit={unit} refMin={refMin} refMax={refMax} />} />
+                      <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2.5}
+                        dot={{ r: 3, fill: color, strokeWidth: 0 }}
+                        activeDot={{ r: 5, fill: color, stroke: "#0D0D0B", strokeWidth: 2 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Reference range */}
           {(refMin !== undefined || refMax !== undefined) && (
@@ -242,8 +245,8 @@ export function HealthMetricCard({ name, value, unit, status, trend, lastDate, c
     <>
       <HoverCard
         className="rounded-3xl p-5 flex flex-col gap-3"
-        style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)", cursor: hasHistory ? "pointer" : "default" }}
-        onClick={hasHistory ? () => setShowDetail(true) : undefined}
+        style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)", cursor: "pointer" }}
+        onClick={() => setShowDetail(true)}
       >
         <div className="flex items-start justify-between">
           <div>
@@ -277,10 +280,10 @@ export function HealthMetricCard({ name, value, unit, status, trend, lastDate, c
       </HoverCard>
 
       <AnimatePresence>
-        {showDetail && hasHistory && (
+        {showDetail && (
           <BiomarkerDetailModal
             name={name} value={Number(value)} unit={unit} status={status}
-            history={history} reference={reference} slug={slug}
+            history={history ?? []} reference={reference} slug={slug}
             onClose={() => setShowDetail(false)}
           />
         )}
