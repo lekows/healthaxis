@@ -14,6 +14,7 @@ const navItems = [
   { href: "/body-map", label: "Mapa Corporal", icon: Activity },
   { href: "/exams", label: "Exames", icon: FlaskConical },
   { href: "/doctors", label: "Médicos", icon: Stethoscope },
+  { href: "/doctor", label: "Painel Médico", icon: Stethoscope },
   { href: "/timeline", label: "Linha do Tempo", icon: Clock },
   { href: "/documents", label: "Documentos", icon: FolderOpen },
   { href: "/anamnesis", label: "Anamnese", icon: ClipboardList },
