@@ -2,14 +2,17 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getMedications, getFamilyHistory } from "@/lib/supabase/queries";
-import { Pill, Users, FlaskConical } from "lucide-react";
+import { getLinkedDoctors } from "@/lib/supabase/doctor-queries";
+import { Pill, Users, FlaskConical, Link2Off, Stethoscope } from "lucide-react";
 import { ProfileEditModal } from "@/components/profile/ProfileEditModal";
+import { LinkedDoctorSection } from "@/components/patient/LinkedDoctorSection";
 
 export default async function ProfilePage() {
-  const [profile, medications, familyHistory] = await Promise.all([
+  const [profile, medications, familyHistory, linkedDoctors] = await Promise.all([
     getProfile(),
     getMedications(),
     getFamilyHistory(),
+    getLinkedDoctors(),
   ]);
 
   if (!profile) return null;
@@ -124,6 +127,8 @@ export default async function ProfilePage() {
             </p>
           </div>
         )}
+
+        <LinkedDoctorSection linkedDoctors={linkedDoctors} />
 
         <MedicalDisclaimer />
       </div>
