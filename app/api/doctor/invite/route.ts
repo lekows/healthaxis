@@ -19,7 +19,7 @@ export async function POST() {
   const { data, error } = await supabase
     .from("doctor_invites")
     .insert({ doctor_id: user.id })
-    .select("token, expires_at")
+    .select("id, token, expires_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
