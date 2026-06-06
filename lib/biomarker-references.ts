@@ -14,15 +14,29 @@ const REFERENCES: Record<string, SexRanges> = {
   // ── Hemograma ──────────────────────────────────────────────────────────
   hemoglobina:        { male: { min: 13.5, max: 17.5 }, female: { min: 12.0, max: 16.0 }, descricao: "Proteína que carrega oxigênio nos glóbulos vermelhos. Valores baixos causam cansaço e indicam anemia." },
   hematocrito:        { male: { min: 41,   max: 53   }, female: { min: 36,   max: 46   }, descricao: "Percentual do sangue ocupado por glóbulos vermelhos. Reflete a capacidade de transporte de oxigênio." },
+  hemacias:           { male: { min: 4.5,  max: 6.0  }, female: { min: 4.0,  max: 5.4  }, descricao: "Contagem de glóbulos vermelhos. Baixa indica anemia; alta pode ocorrer em desidratação ou doenças pulmonares." },
+  eritrocitos:        { male: { min: 4.5,  max: 6.0  }, female: { min: 4.0,  max: 5.4  }, descricao: "Contagem de glóbulos vermelhos. Baixa indica anemia; alta pode ocorrer em desidratação ou doenças pulmonares." },
   vcm:                { universal: { min: 80,  max: 100  }, descricao: "Tamanho médio dos glóbulos vermelhos. Ajuda a identificar o tipo de anemia." },
   hcm:                { universal: { min: 27,  max: 33   }, descricao: "Quantidade de hemoglobina em cada glóbulo vermelho. Útil para classificar anemias." },
   chcm:               { universal: { min: 32,  max: 36   }, descricao: "Concentração de hemoglobina dentro dos glóbulos vermelhos. Indica eficiência na produção de hemoglobina." },
   rdw:                { universal: { min: 11.5, max: 14.5 }, descricao: "Variação de tamanho entre os glóbulos vermelhos. Valores altos podem indicar deficiência nutricional." },
+  reticulocitos:      { universal: { min: 0.5, max: 2.5  }, descricao: "Glóbulos vermelhos imaturos. Elevados indicam que a medula está produzindo mais hemácias, como após hemorragia ou tratamento de anemia." },
   leucocitos:         { universal: { min: 4.0, max: 11.0 }, descricao: "Glóbulos brancos — as células de defesa do organismo. Elevados indicam infecção ou inflamação; baixos, imunidade reduzida." },
+  neutrofilos:              { universal: { min: 45, max: 70 }, descricao: "Principal tipo de glóbulo branco. Elevado indica infecção bacteriana ou inflamação; baixo, risco de infecção grave." },
+  "neutrofilos-segmentados":{ universal: { min: 45, max: 70 }, descricao: "Principal tipo de glóbulo branco. Elevado indica infecção bacteriana ou inflamação; baixo, risco de infecção grave." },
+  segmentados:              { universal: { min: 45, max: 70 }, descricao: "Principal tipo de glóbulo branco. Elevado indica infecção bacteriana ou inflamação; baixo, risco de infecção grave." },
+  bastonetes:               { universal: { min: 0,  max: 5  }, descricao: "Neutrófilos imaturos. Presença elevada ('desvio à esquerda') indica infecção bacteriana aguda." },
+  "neutrofilos-bastonetes":  { universal: { min: 0,  max: 5  }, descricao: "Neutrófilos imaturos. Presença elevada ('desvio à esquerda') indica infecção bacteriana aguda." },
+  linfocitos:         { universal: { min: 20, max: 40 }, descricao: "Células de defesa que combatem vírus e produzem anticorpos. Elevados em infecções virais; baixos, em imunossupressão." },
+  monocitos:          { universal: { min: 2,  max: 8  }, descricao: "Glóbulos brancos que fagocitam agentes infecciosos. Elevados em infecções crônicas ou inflamações." },
+  eosinofilos:        { universal: { min: 1,  max: 5  }, descricao: "Glóbulos brancos ligados a alergias e parasitas. Elevados podem indicar alergia, asma ou infecção por parasita." },
+  basofilos:          { universal: { min: 0,  max: 1  }, descricao: "Glóbulo branco menos frequente, envolvido em reações alérgicas. Raramente elevado em condições normais." },
   plaquetas:          { universal: { min: 150, max: 400  }, descricao: "Células que controlam a coagulação. Baixas aumentam risco de sangramento; altas, risco de trombose." },
+  mpv:                { universal: { min: 7.5, max: 12.5 }, descricao: "Volume médio das plaquetas. Plaquetas maiores costumam ser mais ativas; útil na avaliação de trombocitopenia." },
 
   // ── Glicemia ───────────────────────────────────────────────────────────
   glicose:               { universal: { min: 70, max: 99    }, descricao: "Açúcar no sangue em jejum. Indicador precoce de pré-diabetes e resistência à insulina." },
+  glicemia:              { universal: { min: 70, max: 99    }, descricao: "Açúcar no sangue em jejum. Indicador precoce de pré-diabetes e resistência à insulina." },
   "hemoglobina-glicada": { universal: { max: 5.7             }, descricao: "Média do açúcar nos últimos 3 meses. Essencial para diagnóstico e controle do diabetes." },
   insulina:              { universal: { min: 2.6, max: 24.9 }, descricao: "Hormônio que regula a entrada do açúcar nas células. Elevada em jejum indica resistência à insulina." },
 
@@ -48,7 +62,11 @@ const REFERENCES: Record<string, SexRanges> = {
 
   // ── Função Hepática ────────────────────────────────────────────────────
   "ast-tgo":            { male: { min: 10, max: 40  }, female: { min: 10, max: 32  }, descricao: "Enzima presente no fígado e músculos. Elevada indica dano hepático ou muscular." },
+  ast:                  { descricao: "Enzima presente no fígado e músculos. Elevada indica dano hepático ou muscular." },
+  tgo:                  { descricao: "Enzima presente no fígado e músculos. Elevada indica dano hepático ou muscular." },
   "alt-tgp":            { male: { min: 10, max: 56  }, female: { min: 10, max: 41  }, descricao: "Enzima mais específica do fígado. Principal marcador de inflamação ou lesão hepática." },
+  alt:                  { descricao: "Enzima mais específica do fígado. Principal marcador de inflamação ou lesão hepática." },
+  tgp:                  { descricao: "Enzima mais específica do fígado. Principal marcador de inflamação ou lesão hepática." },
   ggt:                  { male: { min: 7,  max: 73  }, female: { min: 7,  max: 38  }, descricao: "Enzima hepática sensível ao álcool e a medicamentos. Elevada indica sobrecarga hepática." },
   "fosfatase-alcalina": { male: { min: 40, max: 130 }, female: { min: 35, max: 105 }, descricao: "Enzima presente no fígado e nos ossos. Elevada pode indicar doença hepática ou óssea." },
   "bilirrubina-total":  { universal: { min: 0.2, max: 1.2 }, descricao: "Pigmento formado pela degradação dos glóbulos vermelhos. Elevada causa icterícia (pele amarelada)." },
@@ -68,7 +86,10 @@ const REFERENCES: Record<string, SexRanges> = {
   "acido-folico": { universal: { min: 5.4 }, descricao: "Vitamina B9 — essencial para produção de células e DNA. Crítica na gravidez para prevenir malformações." },
 
   // ── Inflamação / Ferro ─────────────────────────────────────────────────
-  "proteina-c-reativa":     { universal: { max: 5   }, descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
+  "proteina-c-reativa":                    { universal: { max: 5 }, descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
+  pcr:                                     { descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
+  "proteina-c-reativa-ultrassensivel":     { descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
+  "proteina-c-reativa-us":                 { descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
   vhs:                      { male: { max: 15 }, female: { max: 20 }, descricao: "Velocidade de sedimentação — indica inflamação inespecífica. Útil para monitorar doenças crônicas." },
   ferritina:                { male: { min: 30, max: 400 }, female: { min: 13, max: 150 }, descricao: "Proteína que armazena ferro. Baixa indica anemia ferropriva; alta pode indicar inflamação ou sobrecarga de ferro." },
   "ferro-serico":           { male: { min: 70, max: 180 }, female: { min: 60, max: 160 }, descricao: "Ferro em circulação no sangue. Baixo causa anemia; deve ser interpretado junto com ferritina e TIBC." },
