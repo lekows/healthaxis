@@ -1,17 +1,9 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { inferStatus } from "@/lib/biomarker-references";
 
 const CATEGORIES = ["Lipídios", "Glicemia", "Tireoide", "Hemograma", "Vitaminas", "Função Renal", "Função Hepática", "Hormônios", "Inflamação", "Outros"] as const;
-
-function computeStatus(value: number, refMin: number | null, refMax: number | null): string {
-  if (refMin === null && refMax === null) return "optimal";
-  if (refMax !== null && value > refMax * 1.2) return "critical";
-  if (refMax !== null && value > refMax) return "high";
-  if (refMin !== null && value < refMin * 0.8) return "critical";
-  if (refMin !== null && value < refMin) return "low";
-  return "optimal";
-}
 
 export async function saveBiomarkerManual(formData: FormData) {
   const supabase = await createClient();
@@ -29,7 +21,11 @@ export async function saveBiomarkerManual(formData: FormData) {
   if (!name || isNaN(value) || !unit) throw new Error("Campos obrigatórios ausentes");
 
   const slug = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  const status = computeStatus(value, refMin, refMax);
+  const refRange = {
+    ...(refMin !== null ? { min: refMin } : {}),
+    ...(refMax !== null ? { max: refMax } : {}),
+  };
+  const status = (refMin !== null || refMax !== null) ? inferStatus(value, refRange) : "optimal";
   const reference = refMin !== null || refMax !== null ? { min: refMin, max: refMax } : null;
   const dateLabel = new Date(dateStr + "T12:00:00").toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
 

@@ -6,23 +6,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { createDocument, saveExamBiomarkers, saveDoctor } from "@/app/documents/actions";
+import { inferStatus } from "@/lib/biomarker-references";
 import type { OCRExamData } from "@/app/api/extract-exam/route";
-
-function inferStatus(
-  valor: number,
-  ref_min: number | null,
-  ref_max: number | null,
-  alterado: boolean
-): "optimal" | "attention" | "critical" {
-  if (!alterado) return "optimal";
-  if (ref_max !== null && valor > ref_max) {
-    return valor > ref_max * 1.5 ? "critical" : "attention";
-  }
-  if (ref_min !== null && valor < ref_min) {
-    return valor < ref_min * 0.5 ? "critical" : "attention";
-  }
-  return "attention";
-}
 
 function normalizeName(s: string): string {
   return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
@@ -93,19 +78,25 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
     }
     if (resultados.length > 0) {
       const bioResult = await saveExamBiomarkers(
-        resultados.map(r => ({
-          slug:      r.slug,
-          name:      r.nome,
-          category:  r.categoria ?? "Outros",
-          unit:      r.unidade   ?? "",
-          value:     r.valor,
-          reference: {
+        resultados.map(r => {
+          const labRef = {
             ...(r.ref_min !== null ? { min: r.ref_min } : {}),
             ...(r.ref_max !== null ? { max: r.ref_max } : {}),
-          },
-          status:    inferStatus(r.valor, r.ref_min, r.ref_max, r.alterado),
-          historico: r.historico ?? [],
-        })),
+          };
+          return {
+            slug:      r.slug,
+            name:      r.nome,
+            category:  r.categoria ?? "Outros",
+            unit:      r.unidade   ?? "",
+            value:     r.valor,
+            ref_min:   r.ref_min,
+            ref_max:   r.ref_max,
+            reference: labRef,
+            // Status calculado numericamente — não depende do `alterado` do LLM
+            status:    inferStatus(r.valor, labRef),
+            historico: r.historico ?? [],
+          };
+        }),
         date
       );
       if (bioResult?.error) {
