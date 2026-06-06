@@ -72,6 +72,10 @@ create policy "patient revokes own links"
   on public.doctor_patient_links for update
   using (auth.uid() = patient_id);
 
+create policy "patient accepts invite"
+  on public.doctor_patient_links for insert
+  with check (auth.uid() = patient_id);
+
 -- ── Tokens de compartilhamento de exames ─────────────────────────────────────
 create table if not exists public.shared_exam_tokens (
   id           uuid primary key default gen_random_uuid(),
