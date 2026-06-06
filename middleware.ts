@@ -40,7 +40,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
-  if (user && isAuthRoute) {
+  const isAuthLoginSignup = pathname === "/auth/login" || pathname === "/auth/signup";
+  if (user && isAuthLoginSignup) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
