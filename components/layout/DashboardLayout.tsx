@@ -146,22 +146,25 @@ export function DashboardLayout({ children, userName = "Usuário" }: { children:
           </motion.main>
         </AnimatePresence>
 
-        {/* Bottom navigation — mobile only */}
+        {/* Bottom navigation — mobile only, deslizável */}
         <nav
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around px-2 py-1"
-          style={{ background: "rgba(13,13,11,0.92)", backdropFilter: "blur(16px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-center gap-1 px-2 py-1 overflow-x-auto"
+          style={{
+            background: "rgba(13,13,11,0.92)",
+            backdropFilter: "blur(16px)",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+          }}
         >
-          {[
-            { href: "/dashboard", icon: LayoutDashboard, label: "Painel" },
-            { href: "/body-map", icon: Activity, label: "Mapa" },
-            { href: "/exams", icon: FlaskConical, label: "Exames" },
-            { href: "/doctors", icon: Stethoscope, label: "Médicos" },
-            { href: "/documents", icon: FolderOpen, label: "Docs" },
-          ].map(({ href, icon: Icon, label }) => {
+          {navItems.map(({ href, icon: Icon, label }) => {
             const active = pathname === href;
             return (
-              <Link key={href} href={href} className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors"
-                style={{ color: active ? "#52B788" : "#5A5A50" }}>
+              <Link key={href} href={href}
+                className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors shrink-0"
+                style={{ color: active ? "#52B788" : "#5A5A50", scrollSnapAlign: "center" }}>
                 {active && (
                   <motion.div
                     layoutId="bottom-nav-active"

@@ -19,7 +19,7 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
     setLoading(true);
     const res = await fetch("/api/doctor/invite", { method: "POST" });
     const data = await res.json();
-    if (data.token) setInvite({ id: "", token: data.token, expires_at: data.expires_at, used_at: null, used_by: null, created_at: new Date().toISOString() });
+    if (data.token) setInvite({ id: data.id, token: data.token, expires_at: data.expires_at, used_at: null, used_by: null, created_at: new Date().toISOString() });
     setLoading(false);
   }
 
