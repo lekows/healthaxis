@@ -3,7 +3,7 @@ import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getBiomarkers, getBiomarkerHistory, getDocuments, getProfile } from "@/lib/supabase/queries";
 import { FlaskConical, Filter, AlertTriangle } from "lucide-react";
-import { BiomarkerTrendCard } from "@/components/dashboard/MetricCards";
+import { BiomarkerTrendCard, HealthMetricCard } from "@/components/dashboard/MetricCards";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ManualBiomarkerModal } from "@/components/exams/ManualBiomarkerModal";
 
@@ -85,19 +85,21 @@ export default async function ExamsPage() {
                 {items.map(b => {
                   const hist = historyBySlug[b.slug];
                   if (hist?.length) {
-                    return <BiomarkerTrendCard key={b.id} name={b.name} value={Number(b.value)} unit={b.unit} status={b.status} history={hist} reference={b.reference as Record<string, number>} />;
+                    return <BiomarkerTrendCard key={b.id} slug={b.slug} name={b.name} value={Number(b.value)} unit={b.unit} status={b.status} history={hist} reference={b.reference as Record<string, number>} />;
                   }
                   return (
-                    <Card key={b.id} className="p-5">
-                      <p className="text-sm font-semibold text-ink">{b.name}</p>
-                      <div className="flex items-end gap-1 mt-2 mb-3">
-                        <span className="text-2xl font-bold text-ink">{b.value}</span>
-                        <span className="text-xs text-ink-faint mb-1">{b.unit}</span>
-                      </div>
-                      <Badge variant={b.status === "optimal" ? "success" : b.status === "attention" ? "warning" : "danger"}>
-                        {b.status === "optimal" ? "Ótimo" : b.status === "attention" ? "Atenção" : "Risco"}
-                      </Badge>
-                    </Card>
+                    <HealthMetricCard
+                      key={b.id}
+                      name={b.name}
+                      value={b.value}
+                      unit={b.unit}
+                      status={b.status}
+                      trend={b.trend}
+                      category={b.category}
+                      lastDate={b.last_date}
+                      slug={b.slug}
+                      reference={b.reference as Record<string, number>}
+                    />
                   );
                 })}
               </div>
