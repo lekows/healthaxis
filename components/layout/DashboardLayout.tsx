@@ -23,8 +23,9 @@ const navItems = [
   { href: "/profile", label: "Perfil", icon: User }
 ];
 
-export function DashboardLayout({ children, userName = "Usuário" }: { children: React.ReactNode; userName?: string }) {
+export function DashboardLayout({ children, userName }: { children: React.ReactNode; userName?: string | null }) {
   const pathname = usePathname();
+  const displayName = userName?.trim() || "Usuário";
 
   return (
     <div className="min-h-screen flex" style={{ background: "#0D0D0B", color: "#E8E4D9" }}>
@@ -93,10 +94,10 @@ export function DashboardLayout({ children, userName = "Usuário" }: { children:
           <div className="flex items-center gap-3 px-3 py-2.5 mb-2 rounded-2xl" style={{ background: "rgba(255,255,255,0.03)" }}>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
               style={{ background: "rgba(82,183,136,0.18)", color: "#52B788" }}>
-              {userName.charAt(0).toUpperCase()}
+              {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate" style={{ color: "#E8E4D9" }}>{userName.split(" ")[0]}</p>
+              <p className="text-xs font-medium truncate" style={{ color: "#E8E4D9" }}>{displayName.split(" ")[0]}</p>
               <p className="text-xs truncate" style={{ color: "#5A5A50" }}>Plano gratuito</p>
             </div>
           </div>

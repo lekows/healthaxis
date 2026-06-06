@@ -27,6 +27,18 @@ create policy "patient reads doctor profile"
   on public.doctor_profiles for select
   using (true);
 
+-- Médico pode ler o profiles dos pacientes vinculados (para exibir nome no painel)
+create policy "doctor reads linked patient profiles"
+  on public.profiles for select
+  using (
+    exists (
+      select 1 from public.doctor_patient_links
+      where doctor_patient_links.doctor_id = auth.uid()
+        and doctor_patient_links.patient_id = profiles.id
+        and doctor_patient_links.revoked_at is null
+    )
+  );
+
 -- ── Convites gerados pelo médico ─────────────────────────────────────────────
 create table if not exists public.doctor_invites (
   id          uuid primary key default gen_random_uuid(),
