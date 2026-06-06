@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = params.get("oauth_error");
+    if (oauthError) setError(`Erro ao entrar com provedor externo: ${oauthError}`);
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -34,10 +40,10 @@ export default function LoginPage() {
     router.refresh();
   }
 
-  async function handleGoogleLogin() {
+  async function handleOAuth(provider: "google" | "apple") {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
   }
@@ -97,7 +103,7 @@ export default function LoginPage() {
 
         <button
           type="button"
-          onClick={handleGoogleLogin}
+          onClick={() => handleOAuth("google")}
           className="mt-3 w-full py-3 rounded-lg text-sm font-medium border border-white/10 transition-colors flex items-center justify-center gap-2.5 hover:bg-white/5"
           style={{ color: "rgba(255,255,255,0.7)" }}
         >

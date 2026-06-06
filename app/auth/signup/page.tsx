@@ -63,10 +63,10 @@ export default function SignupPage() {
     router.refresh();
   }
 
-  async function handleGoogleSignup() {
+  async function handleOAuth(provider: "google" | "apple") {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
   }
@@ -199,7 +199,7 @@ export default function SignupPage() {
 
         <button
           type="button"
-          onClick={handleGoogleSignup}
+          onClick={() => handleOAuth("google")}
           className="mt-3 w-full py-3 rounded-lg text-sm font-medium border border-white/10 transition-colors flex items-center justify-center gap-2.5 hover:bg-white/5"
           style={{ color: "rgba(255,255,255,0.7)" }}
         >
