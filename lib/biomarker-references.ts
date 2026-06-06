@@ -99,6 +99,11 @@ const REFERENCES: Record<string, SexRanges> = {
   // ── Hormônios ──────────────────────────────────────────────────────────
   cortisol:             { universal: { min: 5, max: 25 }, descricao: "Hormônio do estresse produzido pelas adrenais. Regula energia, imunidade e resposta ao estresse." },
   "testosterona-total": { male: { min: 270, max: 1070 }, female: { min: 15, max: 70 }, descricao: "Principal hormônio sexual masculino, presente em ambos os sexos. Influencia libido, massa muscular e humor." },
+  fsh:          { descricao: "Hormônio folículo-estimulante, da hipófise. Regula ovários e testículos; usado para avaliar fertilidade e menopausa." },
+  lh:           { descricao: "Hormônio luteinizante, da hipófise. Controla a ovulação e a produção de testosterona; avalia fertilidade e função gonadal." },
+  estradiol:    { descricao: "Principal estrogênio. Regula o ciclo menstrual e a saúde óssea; varia conforme a fase do ciclo e a menopausa." },
+  progesterona: { descricao: "Hormônio que prepara o útero para a gravidez e regula o ciclo menstrual. Útil para confirmar a ovulação." },
+  prolactina:   { descricao: "Hormônio que estimula a produção de leite. Elevada fora da gravidez pode causar irregularidade menstrual e infertilidade." },
 };
 
 export function getReference(
@@ -117,8 +122,75 @@ export function getReference(
   return null;
 }
 
-export function getBiomarkerInfo(slug: string): string | null {
-  return REFERENCES[slug]?.descricao ?? null;
+function normalizeText(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const NORMALIZED_KEYS: Record<string, string> = Object.keys(REFERENCES).reduce(
+  (acc, key) => { acc[normalizeText(key)] = key; return acc; },
+  {} as Record<string, string>,
+);
+
+const KEYWORD_ALIASES: [RegExp, string][] = [
+  [/gama glutamil|glutamil transferase|gama gt|\bggt\b/, "ggt"],
+  [/foliculo estimulante|\bfsh\b/, "fsh"],
+  [/luteinizante|\blh\b/, "lh"],
+  [/prolactina/, "prolactina"],
+  [/estradiol/, "estradiol"],
+  [/progesterona/, "progesterona"],
+  [/aspartato|transaminase oxalacetica|\bast\b|\btgo\b/, "ast-tgo"],
+  [/alanina|transaminase piruvica|\balt\b|\btgp\b/, "alt-tgp"],
+  [/proteina c reativa|\bpcr\b/, "proteina-c-reativa"],
+  [/triglicer/, "triglicerides"],
+  [/colesterol hdl|hdl colesterol/, "hdl-colesterol"],
+  [/colesterol ldl|ldl colesterol/, "ldl-colesterol"],
+  [/colesterol total/, "colesterol-total"],
+  [/linfocit/, "linfocitos"],
+  [/neutrofil/, "neutrofilos"],
+  [/monocit/, "monocitos"],
+  [/eosinofil/, "eosinofilos"],
+  [/basofil/, "basofilos"],
+  [/hemacia|eritrocit/, "hemacias"],
+  [/reticulocit/, "reticulocitos"],
+  [/plaqueta/, "plaquetas"],
+  [/leucocit/, "leucocitos"],
+  [/hematocrit/, "hematocrito"],
+  [/hemoglobina glicada|hemoglobina glicosilada|\ba1c\b|hba1c/, "hemoglobina-glicada"],
+  [/\bhemoglobina\b/, "hemoglobina"],
+  [/glicemia|glicose/, "glicose"],
+  [/creatinina/, "creatinina"],
+  [/acido urico/, "acido-urico"],
+  [/vitamina d|25 hidroxi/, "vitamina-d"],
+  [/vitamina b12|cobalamina/, "vitamina-b12"],
+  [/acido folico|folato/, "acido-folico"],
+  [/ferritina/, "ferritina"],
+  [/\btsh\b|tireoestimulante/, "tsh"],
+];
+
+export function getBiomarkerInfo(slug?: string | null, name?: string | null): string | null {
+  if (slug && REFERENCES[slug]?.descricao) return REFERENCES[slug]!.descricao!;
+
+  const candidates = [slug, name].filter(Boolean) as string[];
+
+  for (const c of candidates) {
+    const canonical = NORMALIZED_KEYS[normalizeText(c)];
+    if (canonical && REFERENCES[canonical].descricao) return REFERENCES[canonical].descricao!;
+  }
+
+  const haystack = normalizeText(candidates.join(" "));
+  for (const [re, canonical] of KEYWORD_ALIASES) {
+    if (re.test(haystack)) {
+      const d = REFERENCES[canonical]?.descricao;
+      if (d) return d;
+    }
+  }
+
+  return null;
 }
 
 export function inferStatus(

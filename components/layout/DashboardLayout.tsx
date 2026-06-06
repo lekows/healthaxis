@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
-  FolderOpen, Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope
+  FolderOpen, Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode
 } from "lucide-react";
 import { ease } from "@/lib/motion";
 import { signOut } from "@/app/auth/actions";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/exams", label: "Exames", icon: FlaskConical },
   { href: "/doctors", label: "Médicos", icon: Stethoscope },
   { href: "/doctor", label: "Painel Médico", icon: Stethoscope },
+  { href: "/share", label: "Compartilhar", icon: QrCode },
   { href: "/timeline", label: "Linha do Tempo", icon: Clock },
   { href: "/documents", label: "Documentos", icon: FolderOpen },
   { href: "/anamnesis", label: "Anamnese", icon: ClipboardList },

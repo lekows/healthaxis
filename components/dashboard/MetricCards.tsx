@@ -95,7 +95,7 @@ interface DetailModalProps {
 function BiomarkerDetailModal({ name, value, unit, status, history, reference, slug, onClose }: DetailModalProps) {
   const [period, setPeriod] = useState<Period>("all");
   const color = getBiomarkerColor(status);
-  const info = slug ? getBiomarkerInfo(slug) : undefined;
+  const info = getBiomarkerInfo(slug, name) ?? undefined;
   const refMin = reference?.min;
   const refMax = reference?.max;
   const filtered = filterByPeriod(history, period);
