@@ -24,7 +24,8 @@ Para cada parâmetro encontrado, retorne:
 - categoria: classifique em uma dessas opções: Lipídios | Glicemia | Tireoide | Hemograma | Vitaminas | Função Renal | Função Hepática | Coagulação | Hormônios | Inflamação | Outros
 - ref_min: valor mínimo da faixa de referência do laboratório (null se não disponível no documento)
 - ref_max: valor máximo da faixa de referência do laboratório (null se não disponível no documento)
-- alterado: true se o valor está fora da faixa de referência, false se está dentro
+- alterado: compare NUMERICAMENTE valor com ref_min e ref_max; true SOMENTE se valor < ref_min OU valor > ref_max; false se dentro do intervalo ou se ref_min/ref_max forem null
+- ATENÇÃO para hemogramas com tabelas de % e contagem absoluta (/mm³ ou /µL): extraia sempre o par consistente (valor e referência na MESMA unidade). Para leucócitos use a contagem absoluta; para diferencial (segmentados, linfócitos, monócitos etc.) use os %, pois são o valor primário reportado
 - historico: se o documento contiver tabela comparativa (ex: "LAUDO COMPARATIVO" com colunas de datas) ou gráficos com valores anteriores, extraia até 5 resultados anteriores no formato [{ "data": "YYYY-MM-DD", "valor": number }]. Na tabela comparativa, cada coluna é uma data e cada linha um parâmetro — associe o valor de cada coluna à data do cabeçalho daquela coluna; ignore células com "--". Use o 1º dia do mês quando a data for só mês/ano (ex: "Out/24" → "2024-10-01"). Array vazio [] se não houver histórico.
 
 Inclua absolutamente todos os parâmetros com resultado numérico. Não omita nenhum.

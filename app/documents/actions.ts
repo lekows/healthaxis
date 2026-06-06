@@ -52,6 +52,8 @@ export async function saveExamBiomarkers(
     category: string;
     unit: string;
     value: number;
+    ref_min: number | null;
+    ref_max: number | null;
     reference: Record<string, number>;
     status: string;
     historico?: { data: string; valor: number }[];
@@ -70,11 +72,14 @@ export async function saveExamBiomarkers(
       : null;
 
     const resolved = entries.map((e) => {
+      const hasLabRef = e.ref_min !== null || e.ref_max !== null;
       const staticRef = getReference(e.slug, sex, ageYears);
       return {
         ...e,
         reference: staticRef ?? e.reference,
-        status:    staticRef ? inferStatus(e.value, staticRef) : e.status,
+        // Quando o laudo forneceu faixas de referência, confiar no status calculado pelo OCR.
+        // Usar referência estática apenas como fallback quando o laudo não tem faixas.
+        status: hasLabRef ? e.status : (staticRef ? inferStatus(e.value, staticRef) : e.status),
       };
     });
 
