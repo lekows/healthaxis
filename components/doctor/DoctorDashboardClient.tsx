@@ -78,7 +78,7 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
               <div key={p.id} className="flex items-center justify-between px-4 py-3 rounded-2xl"
                 style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{p.patient.name}</p>
+                  <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{p.patient?.name ?? "Paciente"}</p>
                   <p className="text-xs mt-0.5" style={{ color: "#5A5A50" }}>
                     Vinculado em {new Date(p.consent_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
                   </p>
