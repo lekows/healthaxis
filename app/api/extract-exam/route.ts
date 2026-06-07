@@ -10,6 +10,10 @@ export const maxDuration = 60;
 // 8192 truncava a resposta no meio do JSON e o parse falhava ("resposta vazia").
 const MAX_OUTPUT_TOKENS = 16000;
 
+const IDENTIFIER_PROMPT = `Extraia tambem identificador_externo: { tipo: string, valor: string } quando houver
+OS, ordem de servico, pedido, protocolo, atendimento, accession number ou numero do laudo.
+Para exames Sabin, priorize o numero da OS. Use null quando nao houver um identificador confiavel.`;
+
 const SYSTEM = `Você é um extrator de resultados de exames laboratoriais.
 Retorne SOMENTE um objeto JSON válido, sem markdown, sem texto adicional.
 Use ponto como separador decimal.`;
@@ -58,9 +62,24 @@ export type OCRExamData = {
   resultados: OCRResultado[];
   medico_solicitante: OCRMedico | null;
   laboratorio: { nome: string } | null;
+  identificador_externo: { tipo: string; valor: string } | null;
   data_exame: string | null;
   paciente: { nome: string } | null;
 };
+
+function extractKnownExternalIdentifier(text: string): { tipo: string; valor: string } | null {
+  const patterns: { tipo: string; regex: RegExp }[] = [
+    { tipo: "OS", regex: /\bOS\s*[:#-]?\s*([0-9]+(?:-[0-9]+){2})/i },
+    { tipo: "pedido", regex: /\bpedido\s*[:#-]\s*([A-Z0-9][A-Z0-9./-]{3,})/i },
+    { tipo: "protocolo", regex: /\bprotocolo\s*[:#-]\s*([A-Z0-9][A-Z0-9./-]{3,})/i },
+    { tipo: "accession", regex: /\baccession(?:\s+number)?\s*[:#-]\s*([A-Z0-9][A-Z0-9./-]{3,})/i },
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern.regex);
+    if (match) return { tipo: pattern.tipo, valor: match[1] };
+  }
+  return null;
+}
 
 // Recupera objetos {…} de nível superior de um array JSON possivelmente truncado
 // (quando a resposta do Claude excede max_tokens e o JSON fica incompleto no fim).
@@ -86,7 +105,7 @@ function salvageObjects(arrText: string): unknown[] {
 }
 
 function parseResponse(text: string): OCRExamData {
-  const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, data_exame: null, paciente: null };
+  const empty: OCRExamData = { resultados: [], medico_solicitante: null, laboratorio: null, identificador_externo: null, data_exame: null, paciente: null };
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) {
     console.log("[extract-exam] parseResponse: nenhum JSON encontrado no texto:", text.substring(0, 300));
@@ -144,10 +163,14 @@ function parseResponse(text: string): OCRExamData {
     : null;
   const lab = parsed.laboratorio as { nome?: unknown } | null | undefined;
   const laboratorio = lab && typeof lab.nome === "string" ? { nome: lab.nome } : null;
+  const external = parsed.identificador_externo as { tipo?: unknown; valor?: unknown } | null | undefined;
+  const identificadorExterno = external && typeof external.tipo === "string" && typeof external.valor === "string"
+    ? { tipo: external.tipo.trim(), valor: external.valor.trim() }
+    : null;
   const dataExame = typeof parsed.data_exame === "string" ? parsed.data_exame : null;
   const pac = parsed.paciente as { nome?: unknown } | null | undefined;
   const paciente = pac && pac.nome ? { nome: String(pac.nome).trim() } : null;
-  return { resultados, medico_solicitante: medico, laboratorio, data_exame: dataExame, paciente };
+  return { resultados, medico_solicitante: medico, laboratorio, identificador_externo: identificadorExterno, data_exame: dataExame, paciente };
 }
 
 function cleanPdfText(raw: string): string {
@@ -186,6 +209,7 @@ export async function POST(req: NextRequest) {
     // já está no Supabase Storage, então o cliente manda a URL e nós baixamos aqui.
     const fileUrl = form.get("file_url") as string | null;
     const fileType = form.get("file_type") as string | null;
+    const fileName = form.get("file_name") as string | null;
 
     if (!file && !pastedText && !fileUrl) return NextResponse.json({ error: "Arquivo ou texto ausente" }, { status: 400 });
     if (file && file.size > 8 * 1024 * 1024) {
@@ -205,12 +229,16 @@ export async function POST(req: NextRequest) {
         model: "claude-haiku-4-5-20251001",
         max_tokens: MAX_OUTPUT_TOKENS,
         system: SYSTEM,
-        messages: [{ role: "user", content: `${PROMPT_BASE}\n\n---\n\n${truncated}` }],
+        messages: [{ role: "user", content: `${PROMPT_BASE}\n\n${IDENTIFIER_PROMPT}\n\n---\n\n${truncated}` }],
       });
       const block = msg.content[0];
       const responseText = block.type === "text" ? block.text : "";
       const examData = parseResponse(responseText);
-      return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 4000) });
+      return NextResponse.json({
+        ...examData,
+        identificador_externo: examData.identificador_externo ?? extractKnownExternalIdentifier(pastedText),
+        _debug_raw: responseText.substring(0, 4000),
+      });
     }
 
     const imageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -232,12 +260,14 @@ export async function POST(req: NextRequest) {
 
     const client = new Anthropic();
     let responseText = "";
+    let deterministicIdentifier = fileName ? extractKnownExternalIdentifier(fileName) : null;
 
     if (isPDF) {
       // Tenta extrair texto do PDF primeiro (muito mais barato)
       const pdfText = await extractPdfText(buffer);
 
       if (pdfText) {
+        deterministicIdentifier = extractKnownExternalIdentifier(pdfText) ?? deterministicIdentifier;
         // PDF digital com texto selecionável — envia o texto completo (até 120k chars). A tabela
         // LAUDO COMPARATIVO de laudos Sabin/Fleury/DASA fica na última página (~75k chars num laudo
         // de 49 páginas), então o limite precisa cobrir o documento inteiro para capturar o histórico.
@@ -249,7 +279,7 @@ export async function POST(req: NextRequest) {
           system: SYSTEM,
           messages: [{
             role: "user",
-            content: `${PROMPT_BASE}\n\n---\n\n${truncated}`,
+            content: `${PROMPT_BASE}\n\n${IDENTIFIER_PROMPT}\n\n---\n\n${truncated}`,
           }],
         });
         const block = msg.content[0];
@@ -267,7 +297,7 @@ export async function POST(req: NextRequest) {
             role: "user",
             content: [
               { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-              { type: "text", text: PROMPT_BASE },
+              { type: "text", text: `${PROMPT_BASE}\n\n${IDENTIFIER_PROMPT}` },
             ],
           }],
         });
@@ -285,7 +315,7 @@ export async function POST(req: NextRequest) {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: imageMediaType, data: base64 } },
-            { type: "text", text: PROMPT_BASE },
+            { type: "text", text: `${PROMPT_BASE}\n\n${IDENTIFIER_PROMPT}` },
           ],
         }],
       });
@@ -296,7 +326,11 @@ export async function POST(req: NextRequest) {
     console.log("[extract-exam] responseText (primeiros 800 chars):", responseText.substring(0, 800));
     const examData = parseResponse(responseText);
     console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
-    return NextResponse.json({ ...examData, _debug_raw: responseText.substring(0, 4000) });
+    return NextResponse.json({
+      ...examData,
+      identificador_externo: deterministicIdentifier ?? examData.identificador_externo,
+      _debug_raw: responseText.substring(0, 4000),
+    });
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
     console.error("[extract-exam]", raw);
