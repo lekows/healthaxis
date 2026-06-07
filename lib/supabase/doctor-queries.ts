@@ -32,7 +32,7 @@ export interface LinkedDoctor {
   patient_id: string;
   consent_at: string;
   revoked_at: string | null;
-  doctor: { name: string; doctor_profiles: { crm: string; crm_uf: string; specialty: string | null }[] };
+  doctor: { name: string; doctor_profiles: { crm: string; crm_uf: string; specialty: string | null }[] } | null;
 }
 
 export interface SharedExamToken {

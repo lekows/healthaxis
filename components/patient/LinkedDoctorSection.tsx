@@ -32,7 +32,8 @@ export function LinkedDoctorSection({ linkedDoctors }: Props) {
       </h2>
       <div className="space-y-3">
         {doctors.map((link) => {
-          const dp = link.doctor.doctor_profiles?.[0];
+          const doctorName = link.doctor?.name ?? "Médico";
+          const dp = link.doctor?.doctor_profiles?.[0];
           const crmLabel = dp ? `CRM ${dp.crm}/${dp.crm_uf}${dp.specialty ? ` · ${dp.specialty}` : ""}` : "";
           return (
             <div key={link.id} className="flex items-center justify-between gap-4 px-4 py-4 rounded-2xl"
@@ -43,7 +44,7 @@ export function LinkedDoctorSection({ linkedDoctors }: Props) {
                   <Stethoscope size={16} style={{ color: "#52B788" }} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{link.doctor.name}</p>
+                  <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{doctorName}</p>
                   {crmLabel && <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>{crmLabel}</p>}
                   <p className="text-xs mt-0.5" style={{ color: "#5A5A50" }}>
                     Vinculado em {new Date(link.consent_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
