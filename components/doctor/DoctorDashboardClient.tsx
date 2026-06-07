@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { DoctorInviteQR } from "./DoctorInviteQR";
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus, Users, ChevronRight } from "lucide-react";
 import type { DoctorInvite, LinkedPatient } from "@/lib/supabase/doctor-queries";
 
 interface Props {
@@ -75,7 +76,8 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
         ) : (
           <div className="space-y-3">
             {patients.map((p) => (
-              <div key={p.id} className="flex items-center justify-between px-4 py-3 rounded-2xl"
+              <Link key={p.id} href={`/doctor/patient/${p.patient_id}`}
+                className="flex items-center justify-between px-4 py-3 rounded-2xl transition-all hover:opacity-80"
                 style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <div>
                   <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{p.patient?.name ?? "Paciente"}</p>
@@ -83,8 +85,11 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
                     Vinculado em {new Date(p.consent_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
                   </p>
                 </div>
-                <div className="w-2 h-2 rounded-full" style={{ background: "#52B788" }} title="Ativo" />
-              </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full" style={{ background: "#52B788" }} title="Ativo" />
+                  <ChevronRight size={16} style={{ color: "#5A5A50" }} />
+                </div>
+              </Link>
             ))}
           </div>
         )}
