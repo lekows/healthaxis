@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getReference, inferStatus } from "@/lib/biomarker-references";
 
-type ActionResult = { error?: string };
+type ActionResult = { error?: string; duplicate?: boolean; id?: string };
 
 export async function createDocument(data: {
   title: string;
@@ -13,13 +13,14 @@ export async function createDocument(data: {
   date: string;
   tags: string[];
   file_url: string | null;
+  content_hash?: string | null;
 }): Promise<ActionResult> {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Sessão expirada. Faça login novamente." };
 
-    const { error } = await supabase.from("documents").insert({
+    const { data: document, error } = await supabase.from("documents").insert({
       user_id:  user.id,
       title:    data.title,
       type:     data.type,
@@ -27,22 +28,67 @@ export async function createDocument(data: {
       date:     data.date,
       tags:     data.tags,
       file_url: data.file_url,
+      content_hash: data.content_hash ?? null,
       status:   "pending",
-    });
+    }).select("id").single();
 
     if (error) {
-      if (error.code === "23505")
-        return { error: "Exame duplicado — já existe um documento com este título, laboratório e data." };
+      if (error.code === "23505") return { error: "Este exame ja foi enviado anteriormente.", duplicate: true };
       return { error: error.message };
     }
 
     revalidatePath("/documents");
     revalidatePath("/exams");
     revalidatePath("/dashboard");
-    return {};
+    return { id: document.id };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erro inesperado ao salvar documento." };
   }
+}
+
+export async function checkDocumentContentDuplicate(contentHash: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessao expirada. Faca login novamente." };
+
+  const { data, error } = await supabase
+    .from("documents")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("content_hash", contentHash)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  return data ? { duplicate: true } : {};
+}
+
+export async function registerDocumentExamIdentity(data: {
+  documentId: string;
+  sourceLab: string | null;
+  externalOrderId: string | null;
+  externalOrderType: string | null;
+  semanticFingerprint: string | null;
+}): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessao expirada. Faca login novamente." };
+
+  const { error } = await supabase
+    .from("documents")
+    .update({
+      source_lab: data.sourceLab,
+      external_order_id: data.externalOrderId,
+      external_order_type: data.externalOrderType,
+      semantic_fingerprint: data.semanticFingerprint,
+    })
+    .eq("id", data.documentId)
+    .eq("user_id", user.id);
+
+  if (error?.code === "23505") {
+    await supabase.from("documents").delete().eq("id", data.documentId).eq("user_id", user.id);
+    return { error: "Este exame ja foi enviado anteriormente.", duplicate: true };
+  }
+  if (error) return { error: error.message };
+  return {};
 }
 
 export async function saveExamBiomarkers(

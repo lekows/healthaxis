@@ -5,8 +5,20 @@ import { X, Upload, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
-import { createDocument, saveExamBiomarkers, saveDoctor } from "@/app/documents/actions";
+import {
+  checkDocumentContentDuplicate,
+  createDocument,
+  registerDocumentExamIdentity,
+  saveExamBiomarkers,
+  saveDoctor,
+} from "@/app/documents/actions";
 import { inferStatus } from "@/lib/biomarker-references";
+import {
+  buildExamSemanticInput,
+  normalizeExamIdentifier,
+  normalizeLabName,
+  sha256Hex,
+} from "@/lib/exam-deduplication";
 import type { OCRExamData } from "@/app/api/extract-exam/route";
 
 function normalizeName(s: string): string {
@@ -26,6 +38,8 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const router       = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingOcr   = useRef<OCRExamData | null>(null);
+  const pendingDocumentId = useRef<string | null>(null);
+  const pendingStoragePath = useRef<string | null>(null);
 
   const [inputMode, setInputMode]   = useState<"file" | "text">("file");
   const [file, setFile]             = useState<File | null>(null);
@@ -60,6 +74,47 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   };
 
   const saveOcrResults = async (data: OCRExamData) => {
+    const semanticInput = buildExamSemanticInput({
+      lab: data.laboratorio?.nome ?? lab,
+      examDate: data.data_exame ?? date,
+      results: data.resultados.map((result) => ({
+        slug: result.slug,
+        value: result.valor,
+        unit: result.unidade ?? "",
+      })),
+    });
+    const documentId = pendingDocumentId.current;
+    if (!documentId) {
+      setError("Documento salvo sem identificador interno. Recarregue a pagina antes de tentar novamente.");
+      setLoading(false);
+      return;
+    }
+    const identityResult = await registerDocumentExamIdentity({
+      documentId,
+      sourceLab: normalizeLabName(data.laboratorio?.nome ?? lab),
+      externalOrderId: normalizeExamIdentifier(data.identificador_externo?.valor),
+      externalOrderType: normalizeExamIdentifier(data.identificador_externo?.tipo),
+      semanticFingerprint: semanticInput ? await sha256Hex(semanticInput) : null,
+    });
+
+    if (identityResult.duplicate) {
+      if (pendingStoragePath.current) {
+        await createClient().storage.from("exam-files").remove([pendingStoragePath.current]);
+      }
+      pendingDocumentId.current = null;
+      pendingStoragePath.current = null;
+      setError("Este exame ja foi enviado anteriormente.");
+      setLoading(false);
+      router.refresh();
+      return;
+    }
+    if (identityResult.error) {
+      setError(`Documento salvo. Erro ao registrar identificador do exame: ${identityResult.error}`);
+      setLoading(false);
+      router.refresh();
+      return;
+    }
+
     if (data.medico_solicitante?.nome) {
       await saveDoctor({
         name: data.medico_solicitante.nome,
@@ -135,6 +190,19 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
     setNameWarning(null);
 
     try {
+      const contentHash = inputMode === "text"
+        ? await sha256Hex(pastedText.trim())
+        : file
+          ? await sha256Hex(file)
+          : null;
+
+      if (contentHash) {
+        setLoadingMsg("Verificando duplicidade...");
+        const duplicate = await checkDocumentContentDuplicate(contentHash);
+        if (duplicate.error) { setError(duplicate.error); return; }
+        if (duplicate.duplicate) { setError("Este exame ja foi enviado anteriormente."); return; }
+      }
+
       // 1. Upload para Supabase Storage
       setLoadingMsg("Salvando documento…");
       let fileUrl: string | null = null;
@@ -143,6 +211,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         const ext  = file.name.split(".").pop() ?? "pdf";
         const path = `${authUser?.id ?? "anon"}/${Date.now()}.${ext}`;
+        pendingStoragePath.current = path;
         const { data: up, error: upErr } = await supabase.storage
           .from("exam-files")
           .upload(path, file, { upsert: false });
@@ -160,8 +229,17 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         date,
         tags:  tags.split(",").map(t => t.trim()).filter(Boolean),
         file_url: fileUrl,
+        content_hash: contentHash,
       });
-      if (docResult?.error) { setError(docResult.error); return; }
+      if (docResult?.error) {
+        if (pendingStoragePath.current) {
+          await createClient().storage.from("exam-files").remove([pendingStoragePath.current]);
+          pendingStoragePath.current = null;
+        }
+        setError(docResult.error);
+        return;
+      }
+      pendingDocumentId.current = docResult.id ?? null;
 
       // 3. Extração automática via OCR (exames laboratoriais com arquivo ou texto colado)
       const hasContent = inputMode === "text" ? pastedText.trim().length > 10 : !!file;
@@ -175,8 +253,10 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             // Arquivo já está no Storage — manda a URL para não estourar o limite de body do Vercel.
             fd.append("file_url", fileUrl);
             fd.append("file_type", file!.type);
+            fd.append("file_name", file!.name);
           } else {
             fd.append("file", file!);
+            fd.append("file_name", file!.name);
           }
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
           const raw = await res.text();
