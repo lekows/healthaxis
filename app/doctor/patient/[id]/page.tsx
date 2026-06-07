@@ -2,7 +2,8 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile, getLinkedPatientPanel } from "@/lib/supabase/doctor-queries";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
-import { BiomarkerCard, STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
+import { STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
+import { HealthMetricCard } from "@/components/dashboard/MetricCards";
 import { AlertTriangle, FileText, FlaskConical, ArrowLeft, ShieldAlert, User } from "lucide-react";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
@@ -10,6 +11,12 @@ import Link from "next/link";
 interface Props {
   params: Promise<{ id: string }>;
 }
+
+type PanelBiomarker = {
+  id: string; slug: string; name: string; value: string; unit: string;
+  status: string; trend: string; category: string; last_date: string | null;
+  reference: Record<string, unknown> | null;
+};
 
 function age(dob: string | null): string {
   if (!dob) return "";
@@ -38,6 +45,28 @@ export default async function DoctorPatientPage({ params }: Props) {
   const outOfRange = sorted.filter((b) => isOutOfRange(b.status));
   const attention = sorted.filter((b) => b.status === "attention");
   const normal = sorted.filter((b) => b.status === "optimal");
+  const normalCategories = [...new Set(normal.map((b) => b.category))];
+
+  const historyBySlug = panel.history.reduce<Record<string, { date: string; value: number }[]>>((acc, h) => {
+    (acc[h.biomarker_slug] ??= []).push({ date: h.date_label, value: Number(h.value) });
+    return acc;
+  }, {});
+
+  const renderCard = (b: PanelBiomarker) => (
+    <HealthMetricCard
+      key={b.id}
+      name={b.name}
+      value={b.value}
+      unit={b.unit}
+      status={b.status}
+      trend={b.trend}
+      lastDate={b.last_date ?? new Date().toISOString()}
+      category={b.category}
+      slug={b.slug}
+      history={historyBySlug[b.slug] ?? []}
+      reference={(b.reference as Record<string, number>) ?? undefined}
+    />
+  );
 
   const patientName = panel.patient?.name ?? "Paciente";
   const ageLabel = age(panel.patient?.dob ?? null);
@@ -88,7 +117,7 @@ export default async function DoctorPatientPage({ params }: Props) {
               <AlertTriangle size={14} style={{ color: "#C1440E" }} /> Fora do intervalo ({outOfRange.length})
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {outOfRange.map((b) => <BiomarkerCard key={b.id} b={b} />)}
+              {outOfRange.map(renderCard)}
             </div>
           </div>
         )}
@@ -100,7 +129,7 @@ export default async function DoctorPatientPage({ params }: Props) {
               <FlaskConical size={14} style={{ color: "#F4A261" }} /> Atenção ({attention.length})
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {attention.map((b) => <BiomarkerCard key={b.id} b={b} />)}
+              {attention.map(renderCard)}
             </div>
           </div>
         )}
@@ -125,16 +154,24 @@ export default async function DoctorPatientPage({ params }: Props) {
           </div>
         )}
 
-        {/* Normais (recolhido visualmente, mas listado para contexto) */}
+        {/* Dentro do intervalo — agrupado por categoria, sempre visível */}
         {normal.length > 0 && (
-          <details>
-            <summary className="text-sm font-semibold uppercase tracking-wider mb-4 cursor-pointer flex items-center gap-2" style={{ color: "#9A9688" }}>
+          <div className="space-y-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2" style={{ color: "#9A9688" }}>
               <FlaskConical size={14} style={{ color: "#52B788" }} /> Dentro do intervalo ({normal.length})
-            </summary>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
-              {normal.map((b) => <BiomarkerCard key={b.id} b={b} />)}
-            </div>
-          </details>
+            </h2>
+            {normalCategories.map((cat) => {
+              const items = normal.filter((b) => b.category === cat);
+              return (
+                <div key={cat}>
+                  <p className="text-xs uppercase tracking-wider mb-3" style={{ color: "#5A5A50" }}>{cat}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {items.map(renderCard)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {panel.biomarkers.length === 0 && panel.documents.length === 0 && (

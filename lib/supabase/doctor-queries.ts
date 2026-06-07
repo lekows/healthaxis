@@ -102,14 +102,17 @@ export interface PatientPanel {
   patient: { id: string; name: string; dob: string | null; sex: string | null } | null;
   biomarkers: {
     id: string;
+    slug: string;
     name: string;
     value: string;
     unit: string;
     status: string;
+    trend: string;
     category: string;
     last_date: string | null;
     reference: Record<string, unknown> | null;
   }[];
+  history: { biomarker_slug: string; date_label: string; value: number }[];
   documents: {
     id: string;
     title: string;
@@ -140,12 +143,17 @@ export async function getLinkedPatientPanel(patientId: string): Promise<PatientP
     .maybeSingle();
   if (!link) return null;
 
-  const [profileRes, biomarkersRes, documentsRes] = await Promise.all([
+  const [profileRes, biomarkersRes, historyRes, documentsRes] = await Promise.all([
     supabase.from("profiles").select("id, name, dob, sex").eq("id", patientId).maybeSingle(),
     supabase
       .from("biomarkers")
-      .select("id, name, value, unit, status, category, last_date, reference")
+      .select("id, slug, name, value, unit, status, trend, category, last_date, reference")
       .eq("user_id", patientId),
+    supabase
+      .from("biomarker_history")
+      .select("biomarker_slug, date_label, value, recorded_at")
+      .eq("user_id", patientId)
+      .order("recorded_at", { ascending: true }),
     supabase
       .from("documents")
       .select("id, title, date, lab, type, status")
@@ -157,6 +165,7 @@ export async function getLinkedPatientPanel(patientId: string): Promise<PatientP
   return {
     patient: profileRes.data ?? null,
     biomarkers: biomarkersRes.data ?? [],
+    history: historyRes.data ?? [],
     documents: documentsRes.data ?? [],
   };
 }
