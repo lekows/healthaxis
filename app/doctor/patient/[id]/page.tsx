@@ -38,6 +38,7 @@ export default async function DoctorPatientPage({ params }: Props) {
   const outOfRange = sorted.filter((b) => isOutOfRange(b.status));
   const attention = sorted.filter((b) => b.status === "attention");
   const normal = sorted.filter((b) => b.status === "optimal");
+  const normalCategories = [...new Set(normal.map((b) => b.category))];
 
   const patientName = panel.patient?.name ?? "Paciente";
   const ageLabel = age(panel.patient?.dob ?? null);
@@ -125,16 +126,24 @@ export default async function DoctorPatientPage({ params }: Props) {
           </div>
         )}
 
-        {/* Normais (recolhido visualmente, mas listado para contexto) */}
+        {/* Dentro do intervalo — agrupado por categoria, sempre visível */}
         {normal.length > 0 && (
-          <details>
-            <summary className="text-sm font-semibold uppercase tracking-wider mb-4 cursor-pointer flex items-center gap-2" style={{ color: "#9A9688" }}>
+          <div className="space-y-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2" style={{ color: "#9A9688" }}>
               <FlaskConical size={14} style={{ color: "#52B788" }} /> Dentro do intervalo ({normal.length})
-            </summary>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
-              {normal.map((b) => <BiomarkerCard key={b.id} b={b} />)}
-            </div>
-          </details>
+            </h2>
+            {normalCategories.map((cat) => {
+              const items = normal.filter((b) => b.category === cat);
+              return (
+                <div key={cat}>
+                  <p className="text-xs uppercase tracking-wider mb-3" style={{ color: "#5A5A50" }}>{cat}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {items.map((b) => <BiomarkerCard key={b.id} b={b} />)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {panel.biomarkers.length === 0 && panel.documents.length === 0 && (
