@@ -2,20 +2,33 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getMedications, getFamilyHistory } from "@/lib/supabase/queries";
-import { getLinkedDoctors } from "@/lib/supabase/doctor-queries";
+import { getLinkedDoctors, getWatchedBiomarkersByPatient } from "@/lib/supabase/doctor-queries";
+import { createClient } from "@/lib/supabase/server";
 import { Pill, Users, FlaskConical, Link2Off, Stethoscope } from "lucide-react";
 import { ProfileEditModal } from "@/components/profile/ProfileEditModal";
 import { LinkedDoctorSection } from "@/components/patient/LinkedDoctorSection";
 
 export default async function ProfilePage() {
-  const [profile, medications, familyHistory, linkedDoctors] = await Promise.all([
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const [profile, medications, familyHistory, linkedDoctors, watchedRaw] = await Promise.all([
     getProfile(),
     getMedications(),
     getFamilyHistory(),
     getLinkedDoctors(),
+    user ? getWatchedBiomarkersByPatient(user.id) : Promise.resolve([]),
   ]);
 
   if (!profile) return null;
+
+  const watchedByDoctor = watchedRaw.reduce<Record<string, { slug: string; name: string }[]>>(
+    (acc, w) => {
+      (acc[w.doctor_id] ??= []).push({ slug: w.slug, name: w.name });
+      return acc;
+    },
+    {}
+  );
 
   const initials = profile.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("");
   const age = profile.dob
@@ -128,7 +141,7 @@ export default async function ProfilePage() {
           </div>
         )}
 
-        <LinkedDoctorSection linkedDoctors={linkedDoctors} />
+        <LinkedDoctorSection linkedDoctors={linkedDoctors} watchedByDoctor={watchedByDoctor} />
 
         <MedicalDisclaimer />
       </div>

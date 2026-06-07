@@ -1,6 +1,7 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
-import { getDoctorProfile, getLinkedPatientPanel } from "@/lib/supabase/doctor-queries";
+import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers } from "@/lib/supabase/doctor-queries";
+import { WatchedBiomarkerToggle } from "@/components/doctor/WatchedBiomarkerToggle";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
 import { HealthMetricCard } from "@/components/dashboard/MetricCards";
@@ -29,11 +30,13 @@ function age(dob: string | null): string {
 export default async function DoctorPatientPage({ params }: Props) {
   const { id } = await params;
 
-  const [profile, doctorProfile, panel] = await Promise.all([
+  const [profile, doctorProfile, panel, watched] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
     getLinkedPatientPanel(id),
+    getWatchedBiomarkers(id),
   ]);
+  const watchedSlugs = new Set(watched.map((w) => w.slug));
 
   if (!doctorProfile) redirect("/doctor/setup");
   // Sem vínculo ativo → não autorizado.
@@ -53,19 +56,26 @@ export default async function DoctorPatientPage({ params }: Props) {
   }, {});
 
   const renderCard = (b: PanelBiomarker) => (
-    <HealthMetricCard
-      key={b.id}
-      name={b.name}
-      value={b.value}
-      unit={b.unit}
-      status={b.status}
-      trend={b.trend}
-      lastDate={b.last_date ?? new Date().toISOString()}
-      category={b.category}
-      slug={b.slug}
-      history={historyBySlug[b.slug] ?? []}
-      reference={(b.reference as Record<string, number>) ?? undefined}
-    />
+    <div key={b.id} className="relative">
+      <WatchedBiomarkerToggle
+        patientId={id}
+        slug={b.slug}
+        name={b.name}
+        initialWatched={watchedSlugs.has(b.slug)}
+      />
+      <HealthMetricCard
+        name={b.name}
+        value={b.value}
+        unit={b.unit}
+        status={b.status}
+        trend={b.trend}
+        lastDate={b.last_date ?? new Date().toISOString()}
+        category={b.category}
+        slug={b.slug}
+        history={historyBySlug[b.slug] ?? []}
+        reference={(b.reference as Record<string, number>) ?? undefined}
+      />
+    </div>
   );
 
   const patientName = panel.patient?.name ?? "Paciente";

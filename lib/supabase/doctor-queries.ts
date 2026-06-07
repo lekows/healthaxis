@@ -35,6 +35,12 @@ export interface LinkedDoctor {
   doctor: { name: string; doctor_profiles: { crm: string; crm_uf: string; specialty: string | null }[] } | null;
 }
 
+export interface WatchedBiomarker {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 export interface SharedExamToken {
   id: string;
   token: string;
@@ -168,6 +174,31 @@ export async function getLinkedPatientPanel(patientId: string): Promise<PatientP
     history: historyRes.data ?? [],
     documents: documentsRes.data ?? [],
   };
+}
+
+export async function getWatchedBiomarkers(patientId: string): Promise<WatchedBiomarker[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("doctor_watched_biomarkers")
+    .select("id, slug, name")
+    .eq("doctor_id", user.id)
+    .eq("patient_id", patientId)
+    .order("created_at", { ascending: true });
+  return (data ?? []) as WatchedBiomarker[];
+}
+
+export async function getWatchedBiomarkersByPatient(patientId: string): Promise<Array<{ doctor_id: string; slug: string; name: string }>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("doctor_watched_biomarkers")
+    .select("doctor_id, slug, name")
+    .eq("patient_id", patientId)
+    .order("created_at", { ascending: true });
+  return data ?? [];
 }
 
 export async function getMySharedTokens(): Promise<SharedExamToken[]> {
