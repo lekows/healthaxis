@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { AlertTriangle, FileText, FlaskConical } from "lucide-react";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
+import { BiomarkerCard } from "@/components/shared/BiomarkerCard";
 
 interface Props {
   params: Promise<{ token: string }>;
@@ -111,24 +112,7 @@ export default async function SharedExamPage({ params }: Props) {
                 <FlaskConical size={14} style={{ color: "#52B788" }} /> {cat}
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {items.map(b => {
-                  const statusColors: Record<string, string> = {
-                    optimal: "#52B788", attention: "#F4A261", high: "#C1440E", low: "#F4A261", critical: "#C1440E",
-                  };
-                  return (
-                    <div key={b.id} className="rounded-2xl p-4 space-y-1" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                      <p className="text-xs truncate" style={{ color: "#9A9688" }}>{b.name}</p>
-                      <p className="text-lg font-bold" style={{ color: statusColors[b.status] ?? "#E8E4D9" }}>
-                        {b.value} <span className="text-xs font-normal" style={{ color: "#5A5A50" }}>{b.unit}</span>
-                      </p>
-                      {b.last_date && (
-                        <p className="text-xs" style={{ color: "#5A5A50" }}>
-                          {new Date(b.last_date).toLocaleDateString("pt-BR")}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                {items.map(b => <BiomarkerCard key={b.id} b={b} />)}
               </div>
             </div>
           );
