@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { seedUserData, updateUserRole } from "@/app/auth/actions";
+import { updateUserRole } from "@/app/auth/actions";
 
 function translateError(msg: string): string {
   if (msg.includes("Password should be at least")) return "A senha deve ter pelo menos 6 caracteres.";
@@ -55,7 +55,6 @@ export default function SignupPage() {
     const userId = signUpData.user!.id;
     await updateUserRole(userId, role, crm || undefined);
     if (role === "patient") {
-      await seedUserData(userId);
       router.push("/dashboard");
     } else {
       router.push("/doctor/setup");
