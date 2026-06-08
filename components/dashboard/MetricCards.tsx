@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
-import { TrendingUp, TrendingDown, Minus, X, BarChart2 } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { TrendingUp, TrendingDown, Minus, X, BarChart2, Pencil } from "lucide-react";
 import {
   LineChart, Line, ResponsiveContainer, Tooltip,
   ReferenceArea, ReferenceLine, XAxis, YAxis, CartesianGrid,
@@ -10,6 +11,17 @@ import { Badge } from "@/components/ui";
 import { HoverCard, AnimatedProgressBar, StaggerContainer, StaggerItem, fadeUp } from "@/lib/motion";
 import { getBiomarkerColor, getBiomarkerLabel } from "@/lib/utils";
 import { getBiomarkerInfo } from "@/lib/biomarker-references";
+import { correctBiomarker } from "@/app/exams/actions";
+import { useToast } from "@/components/shared/Toast";
+
+const editInputStyle = {
+  background: "#1C1C19", border: "1px solid rgba(255,255,255,0.10)", color: "#E8E4D9",
+  borderRadius: "10px", padding: "8px 10px", fontSize: "14px", width: "100%", outline: "none",
+};
+const editLabelStyle = {
+  color: "#9A9688", fontSize: "11px", fontWeight: 600, textTransform: "uppercase" as const,
+  letterSpacing: "0.06em", marginBottom: "4px", display: "block",
+};
 
 // ── helpers ────────────────────────────────────────────
 type HistoryPoint = { date: string; value: number };
@@ -89,11 +101,53 @@ function PeriodTabs({ value, onChange }: { value: Period; onChange: (p: Period) 
 interface DetailModalProps {
   name: string; value: number; unit: string; status: string;
   history: HistoryPoint[]; reference?: Record<string, number>;
-  slug?: string; onClose: () => void;
+  slug?: string; editable?: boolean; onClose: () => void;
 }
 
-function BiomarkerDetailModal({ name, value, unit, status, history, reference, slug, onClose }: DetailModalProps) {
+function BiomarkerDetailModal({ name, value, unit, status, history, reference, slug, editable, onClose }: DetailModalProps) {
   const [period, setPeriod] = useState<Period>("all");
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [saving, startSave] = useTransition();
+  const [fName, setFName] = useState(name);
+  const [fValue, setFValue] = useState(String(value));
+  const [fUnit, setFUnit] = useState(unit);
+  const [fRefMin, setFRefMin] = useState(reference?.min !== undefined ? String(reference.min) : "");
+  const [fRefMax, setFRefMax] = useState(reference?.max !== undefined ? String(reference.max) : "");
+
+  function handleCorrect() {
+    if (!slug) return;
+    const parsedValue = parseFloat(fValue);
+    if (!fName.trim() || isNaN(parsedValue) || !fUnit.trim()) {
+      showToast("Preencha nome, valor e unidade.", "error");
+      return;
+    }
+    startSave(async () => {
+      try {
+        await correctBiomarker({
+          slug,
+          name: fName,
+          value: parsedValue,
+          unit: fUnit,
+          ref_min: fRefMin === "" ? null : parseFloat(fRefMin),
+          ref_max: fRefMax === "" ? null : parseFloat(fRefMax),
+          original: {
+            value, unit, name,
+            ref_min: reference?.min ?? null,
+            ref_max: reference?.max ?? null,
+          },
+        });
+        showToast("Correção salva. Obrigado por ajudar a melhorar a leitura!", "success");
+        setEditing(false);
+        router.refresh();
+        onClose();
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "Erro ao salvar correção", "error");
+      }
+    });
+  }
+
   const color = getBiomarkerColor(status);
   const info = getBiomarkerInfo(slug, name) ?? undefined;
   const refMin = reference?.min;
@@ -138,11 +192,61 @@ function BiomarkerDetailModal({ name, value, unit, status, history, reference, s
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={variantMap[status] ?? "muted"}>{getBiomarkerLabel(status)}</Badge>
+              {editable && slug && !editing && (
+                <button onClick={() => setEditing(true)} title="Corrigir valor"
+                  className="flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-medium transition-opacity hover:opacity-80"
+                  style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.2)" }}>
+                  <Pencil size={12} /> Corrigir
+                </button>
+              )}
               <button onClick={onClose} className="p-1.5 rounded-xl hover:opacity-70 transition-opacity" style={{ color: "#5A5A50" }}>
                 <X size={16} />
               </button>
             </div>
           </div>
+
+          {/* Form de correção inline */}
+          {editing && (
+            <div className="rounded-2xl p-4 space-y-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(82,183,136,0.2)" }}>
+              <p className="text-xs" style={{ color: "#9A9688" }}>Corrija o que a leitura automática errou. Sua correção ajuda a melhorar o sistema.</p>
+              <div>
+                <label style={editLabelStyle}>Nome</label>
+                <input value={fName} onChange={e => setFName(e.target.value)} style={editInputStyle} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={editLabelStyle}>Valor</label>
+                  <input value={fValue} onChange={e => setFValue(e.target.value)} type="number" step="any" style={editInputStyle} />
+                </div>
+                <div>
+                  <label style={editLabelStyle}>Unidade</label>
+                  <input value={fUnit} onChange={e => setFUnit(e.target.value)} style={editInputStyle} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={editLabelStyle}>Ref. mínima</label>
+                  <input value={fRefMin} onChange={e => setFRefMin(e.target.value)} type="number" step="any" placeholder="—" style={editInputStyle} />
+                </div>
+                <div>
+                  <label style={editLabelStyle}>Ref. máxima</label>
+                  <input value={fRefMax} onChange={e => setFRefMax(e.target.value)} type="number" step="any" placeholder="—" style={editInputStyle} />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleCorrect} disabled={saving}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-50"
+                  style={{ background: "#52B788", color: "#0D0D0B" }}>
+                  {saving ? "Salvando…" : "Salvar correção"}
+                </button>
+                <button onClick={() => setEditing(false)} disabled={saving}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-50"
+                  style={{ background: "rgba(255,255,255,0.05)", color: "#9A9688" }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Explainer */}
           {info && (
@@ -228,10 +332,10 @@ function BiomarkerDetailModal({ name, value, unit, status, history, reference, s
 interface HealthMetricCardProps {
   name: string; value: string | number; unit: string;
   status: string; trend: string; lastDate: string; category: string;
-  slug?: string; history?: HistoryPoint[]; reference?: Record<string, number>;
+  slug?: string; history?: HistoryPoint[]; reference?: Record<string, number>; editable?: boolean;
 }
 
-export function HealthMetricCard({ name, value, unit, status, trend, lastDate, category, slug, history, reference }: HealthMetricCardProps) {
+export function HealthMetricCard({ name, value, unit, status, trend, lastDate, category, slug, history, reference, editable }: HealthMetricCardProps) {
   const [showDetail, setShowDetail] = useState(false);
   const color = getBiomarkerColor(status);
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
@@ -283,7 +387,7 @@ export function HealthMetricCard({ name, value, unit, status, trend, lastDate, c
         {showDetail && (
           <BiomarkerDetailModal
             name={name} value={Number(value)} unit={unit} status={status}
-            history={history ?? []} reference={reference} slug={slug}
+            history={history ?? []} reference={reference} slug={slug} editable={editable}
             onClose={() => setShowDetail(false)}
           />
         )}
@@ -295,10 +399,10 @@ export function HealthMetricCard({ name, value, unit, status, trend, lastDate, c
 // ── BiomarkerTrendCard ─────────────────────────────────
 interface BiomarkerTrendCardProps {
   name: string; value: number; unit: string; status: string;
-  history: HistoryPoint[]; reference?: Record<string, number>; slug?: string;
+  history: HistoryPoint[]; reference?: Record<string, number>; slug?: string; editable?: boolean;
 }
 
-export function BiomarkerTrendCard({ name, value, unit, status, history, reference, slug }: BiomarkerTrendCardProps) {
+export function BiomarkerTrendCard({ name, value, unit, status, history, reference, slug, editable }: BiomarkerTrendCardProps) {
   const [period, setPeriod] = useState<Period>("all");
   const [showDetail, setShowDetail] = useState(false);
   const color = getBiomarkerColor(status);
@@ -375,7 +479,7 @@ export function BiomarkerTrendCard({ name, value, unit, status, history, referen
         {showDetail && (
           <BiomarkerDetailModal
             name={name} value={value} unit={unit} status={status}
-            history={history} reference={reference} slug={slug}
+            history={history} reference={reference} slug={slug} editable={editable}
             onClose={() => setShowDetail(false)}
           />
         )}

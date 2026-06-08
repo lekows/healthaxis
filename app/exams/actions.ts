@@ -53,3 +53,84 @@ export async function saveBiomarkerManual(formData: FormData) {
   revalidatePath("/exams");
   revalidatePath("/dashboard");
 }
+
+export interface CorrectBiomarkerInput {
+  slug: string;
+  name: string;
+  value: number;
+  unit: string;
+  ref_min: number | null;
+  ref_max: number | null;
+  original: {
+    value: number;
+    unit: string;
+    name: string;
+    ref_min: number | null;
+    ref_max: number | null;
+  };
+}
+
+export async function correctBiomarker(input: CorrectBiomarkerInput) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Não autenticado");
+
+  const { slug, name, value, unit, ref_min, ref_max, original } = input;
+  if (!slug || !name.trim() || isNaN(value) || !unit.trim()) {
+    throw new Error("Campos obrigatórios ausentes");
+  }
+
+  const refRange = {
+    ...(ref_min !== null ? { min: ref_min } : {}),
+    ...(ref_max !== null ? { max: ref_max } : {}),
+  };
+  const status = (ref_min !== null || ref_max !== null) ? inferStatus(value, refRange) : "optimal";
+  const reference = ref_min !== null || ref_max !== null ? { min: ref_min, max: ref_max } : null;
+
+  const { error: updErr } = await supabase
+    .from("biomarkers")
+    .update({ name: name.trim(), value: String(value), unit: unit.trim(), reference, status })
+    .eq("user_id", user.id)
+    .eq("slug", slug);
+  if (updErr) throw new Error(updErr.message);
+
+  // Atualiza o ponto mais recente do histórico para o gráfico bater com o valor corrigido.
+  const { data: latest } = await supabase
+    .from("biomarker_history")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("biomarker_slug", slug)
+    .order("recorded_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest?.id) {
+    await supabase.from("biomarker_history").update({ value: String(value) }).eq("id", latest.id);
+  }
+
+  // Captura dos diffs como dado de treino (best-effort: nunca bloqueia a correção).
+  const diffs: { field: string; original_value: string; corrected_value: string }[] = [];
+  if (value !== original.value) diffs.push({ field: "value", original_value: String(original.value), corrected_value: String(value) });
+  if (unit.trim() !== original.unit) diffs.push({ field: "unit", original_value: original.unit, corrected_value: unit.trim() });
+  if (name.trim() !== original.name) diffs.push({ field: "name", original_value: original.name, corrected_value: name.trim() });
+  if (ref_min !== original.ref_min) diffs.push({ field: "ref_min", original_value: String(original.ref_min ?? ""), corrected_value: String(ref_min ?? "") });
+  if (ref_max !== original.ref_max) diffs.push({ field: "ref_max", original_value: String(original.ref_max ?? ""), corrected_value: String(ref_max ?? "") });
+
+  if (diffs.length > 0) {
+    try {
+      await supabase.from("extraction_feedback").insert(
+        diffs.map((d) => ({
+          user_id: user.id,
+          slug,
+          biomarker_name: name.trim(),
+          field: d.field,
+          original_value: d.original_value,
+          corrected_value: d.corrected_value,
+          error_type: "edited",
+        }))
+      );
+    } catch { /* feedback é best-effort */ }
+  }
+
+  revalidatePath("/exams");
+  revalidatePath("/dashboard");
+}

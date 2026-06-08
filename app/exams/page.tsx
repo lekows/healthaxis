@@ -85,7 +85,7 @@ export default async function ExamsPage() {
                 {items.map(b => {
                   const hist = historyBySlug[b.slug];
                   if (hist?.length) {
-                    return <BiomarkerTrendCard key={b.id} slug={b.slug} name={b.name} value={Number(b.value)} unit={b.unit} status={b.status} history={hist} reference={b.reference as Record<string, number>} />;
+                    return <BiomarkerTrendCard key={b.id} slug={b.slug} name={b.name} value={Number(b.value)} unit={b.unit} status={b.status} history={hist} reference={b.reference as Record<string, number>} editable />;
                   }
                   return (
                     <HealthMetricCard
@@ -99,6 +99,7 @@ export default async function ExamsPage() {
                       lastDate={b.last_date}
                       slug={b.slug}
                       reference={b.reference as Record<string, number>}
+                      editable
                     />
                   );
                 })}

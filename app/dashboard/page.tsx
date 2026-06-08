@@ -141,6 +141,7 @@ export default async function DashboardPage() {
                     slug={b.slug}
                     history={(historyBySlug[b.slug] ?? []).map(h => ({ date: h.date_label, value: h.value }))}
                     reference={b.reference as Record<string, number>}
+                    editable
                   />
                 ))}
               </MetricsGrid>
@@ -170,6 +171,7 @@ export default async function DashboardPage() {
                     status={bm.status}
                     history={historyBySlug[bm.slug].map(h => ({ date: h.date_label, value: h.value }))}
                     reference={bm.reference as Record<string, number>}
+                    editable
                   />
                 ))}
               </MetricsGrid>
