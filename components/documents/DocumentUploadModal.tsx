@@ -19,6 +19,7 @@ import {
   normalizeLabName,
   sha256Hex,
 } from "@/lib/exam-deduplication";
+import { readUploadFile, type UploadFileDetails } from "@/lib/upload-file";
 import type { OCRExamData } from "@/app/api/extract-exam/route";
 
 function normalizeName(s: string): string {
@@ -187,10 +188,16 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
     setNameWarning(null);
 
     try {
+      let uploadFile: UploadFileDetails | null = null;
+      if (file) {
+        setLoadingMsg("Lendo arquivo...");
+        uploadFile = await readUploadFile(file);
+      }
+
       const contentHash = inputMode === "text"
         ? await sha256Hex(pastedText.trim())
-        : file
-          ? await sha256Hex(file)
+        : uploadFile
+          ? await sha256Hex(uploadFile.buffer)
           : null;
 
       if (contentHash) {
@@ -203,39 +210,19 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
       // 1. Upload para Supabase Storage
       setLoadingMsg("Salvando documento…");
       let fileUrl: string | null = null;
-      if (file) {
-        // Lê o arquivo para memória antes de enviar.
-        // Arquivos do Google Drive no Android são virtuais e precisam ser
-        // baixados pelo browser antes do upload — arrayBuffer() garante isso.
-        setLoadingMsg("Lendo arquivo…");
-        let fileBuffer: ArrayBuffer;
-        try {
-          fileBuffer = await file.arrayBuffer();
-        } catch {
-          setError("Não foi possível ler o arquivo. Se ele estiver no Google Drive, baixe-o para o dispositivo primeiro.");
-          setLoading(false);
-          return;
-        }
-        if (fileBuffer.byteLength === 0) {
-          setError("O arquivo está vazio. Se ele estiver no Google Drive, baixe-o para o dispositivo primeiro.");
-          setLoading(false);
-          return;
-        }
-
+      if (file && uploadFile) {
         setLoadingMsg("Salvando documento…");
         const supabase = createClient();
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        const nameParts = file.name.split(".");
-        const ext = nameParts.length > 1 ? (nameParts.pop() ?? "pdf") : "pdf";
-        const path = `${authUser?.id ?? "anon"}/${Date.now()}.${ext}`;
+        if (!authUser) {
+          setError("Sessao expirada. Faca login novamente.");
+          return;
+        }
+        const path = `${authUser.id}/${Date.now()}.${uploadFile.extension}`;
         pendingStoragePath.current = path;
-        const contentType = (file.type && file.type !== "application/octet-stream")
-          ? file.type
-          : ext === "pdf" ? "application/pdf" : "application/octet-stream";
-        const blob = new Blob([fileBuffer], { type: contentType });
         const { data: up, error: upErr } = await supabase.storage
           .from("exam-files")
-          .upload(path, blob, { upsert: false, contentType });
+          .upload(path, uploadFile.blob, { upsert: false, contentType: uploadFile.contentType });
         if (upErr) {
           pendingStoragePath.current = null;
           setError(`Falha ao enviar o arquivo: ${upErr.message}`);
@@ -336,7 +323,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-lg flex flex-col rounded-3xl"
+      <div className="w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col rounded-3xl"
         style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.1)" }}>
 
         {/* Header */}
@@ -350,7 +337,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto">
 
           {/* Toggle arquivo / colar texto */}
           <div className="flex rounded-xl p-0.5 gap-0.5" style={{ background: "#1C1C19", border: "1px solid rgba(255,255,255,0.08)" }}>

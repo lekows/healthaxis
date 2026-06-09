@@ -28,10 +28,12 @@ export function buildExamSemanticInput(data: {
   return `${normalizeLabName(data.lab) ?? "unknown"}|${data.examDate}|${results}`;
 }
 
-export async function sha256Hex(value: Blob | string): Promise<string> {
+export async function sha256Hex(value: Blob | string | ArrayBuffer): Promise<string> {
   const bytes = typeof value === "string"
     ? new TextEncoder().encode(value)
-    : new Uint8Array(await value.arrayBuffer());
+    : value instanceof ArrayBuffer
+      ? new Uint8Array(value)
+      : new Uint8Array(await value.arrayBuffer());
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

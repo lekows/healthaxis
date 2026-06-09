@@ -5,6 +5,7 @@ import { getDocuments, getProfile } from "@/lib/supabase/queries";
 import { FolderOpen, FileText, FlaskConical, Image as ImageIcon, CheckCircle, Clock } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { UploadDocumentButton } from "@/components/documents/DocumentUploadModal";
+import Link from "next/link";
 import { DeleteDocumentButton } from "@/components/documents/DeleteDocumentButton";
 
 const typeIcon: Record<string, React.ElementType> = {
@@ -27,7 +28,12 @@ export default async function DocumentsPage() {
             <h1 className="text-2xl font-bold text-ink">Documentos</h1>
             <p className="text-ink-muted text-sm mt-1">{documents.length} arquivos · {reviewed} revisados</p>
           </div>
-          <UploadDocumentButton userName={profile?.name} />
+          <div className="flex items-center gap-3">
+            <Link href="/documents/upload-test" className="text-xs text-ink-muted underline underline-offset-4">
+              Diagnosticar upload
+            </Link>
+            <UploadDocumentButton userName={profile?.name} />
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
