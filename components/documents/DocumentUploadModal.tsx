@@ -204,6 +204,25 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
       setLoadingMsg("Salvando documento…");
       let fileUrl: string | null = null;
       if (file) {
+        // Lê o arquivo para memória antes de enviar.
+        // Arquivos do Google Drive no Android são virtuais e precisam ser
+        // baixados pelo browser antes do upload — arrayBuffer() garante isso.
+        setLoadingMsg("Lendo arquivo…");
+        let fileBuffer: ArrayBuffer;
+        try {
+          fileBuffer = await file.arrayBuffer();
+        } catch {
+          setError("Não foi possível ler o arquivo. Se ele estiver no Google Drive, baixe-o para o dispositivo primeiro.");
+          setLoading(false);
+          return;
+        }
+        if (fileBuffer.byteLength === 0) {
+          setError("O arquivo está vazio. Se ele estiver no Google Drive, baixe-o para o dispositivo primeiro.");
+          setLoading(false);
+          return;
+        }
+
+        setLoadingMsg("Salvando documento…");
         const supabase = createClient();
         const { data: { user: authUser } } = await supabase.auth.getUser();
         const nameParts = file.name.split(".");
@@ -213,12 +232,13 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         const contentType = (file.type && file.type !== "application/octet-stream")
           ? file.type
           : ext === "pdf" ? "application/pdf" : "application/octet-stream";
+        const blob = new Blob([fileBuffer], { type: contentType });
         const { data: up, error: upErr } = await supabase.storage
           .from("exam-files")
-          .upload(path, file, { upsert: false, contentType });
+          .upload(path, blob, { upsert: false, contentType });
         if (upErr) {
           pendingStoragePath.current = null;
-          setError("Falha ao enviar o arquivo. Verifique sua conexão e tente novamente.");
+          setError(`Falha ao enviar o arquivo: ${upErr.message}`);
           setLoading(false);
           return;
         }
