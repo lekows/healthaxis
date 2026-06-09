@@ -1,35 +1,37 @@
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { HealthMetricCard, BiomarkerTrendCard, MetricsGrid } from "@/components/dashboard/MetricCards";
+import { BiomarkerPanel } from "@/components/dashboard/BiomarkerPanel";
 import { PreventiveReminderCard, RiskAreaCard, RecentDocumentCard } from "@/components/dashboard/EventCards";
 import { CollapsibleList } from "@/components/dashboard/CollapsibleList";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
-import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore, getDoctors } from "@/lib/supabase/queries";
-import { getIsDoctor } from "@/lib/supabase/doctor-queries";
-import { Activity, Clock, FileText, Bell, ArrowRight, FlaskConical, Stethoscope, Upload } from "lucide-react";
+import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getDoctors, getMedications, getFamilyHistory } from "@/lib/supabase/queries";
+import { getLinkedDoctors, getIsDoctor } from "@/lib/supabase/doctor-queries";
+import { Activity, ArrowRight, FlaskConical, Stethoscope, Upload } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { HealthOrganizationScoreCard } from "@/components/dashboard/HealthOrganizationScoreCard";
+import { NextBestActionCard } from "@/components/dashboard/NextBestActionCard";
+import { LatestExamSummaryCard } from "@/components/dashboard/LatestExamSummaryCard";
+import { CompactTrendsCard, type CompactTrend } from "@/components/dashboard/CompactTrendsCard";
+import { RoutineQuickCard } from "@/components/dashboard/RoutineQuickCard";
+import { ConsultationReminderCard } from "@/components/dashboard/ConsultationReminderCard";
+import { ShareWithDoctorCard } from "@/components/dashboard/ShareWithDoctorCard";
+import { computeOrganizationScore, nextBestAction, type ScoreSignal } from "@/lib/health-organization-score";
 
 export default async function DashboardPage() {
-  const [profile, biomarkers, history, documents, reminders, healthScore, doctors, isDoctor] = await Promise.all([
+  const [profile, biomarkers, history, documents, reminders, doctors, linkedDoctors, medications, familyHistory, isDoctor] = await Promise.all([
     getProfile(),
     getBiomarkers(),
     getBiomarkerHistory(),
     getDocuments(),
     getPreventiveReminders(),
-    getHealthScore(),
     getDoctors(),
+    getLinkedDoctors(),
+    getMedications(),
+    getFamilyHistory(),
     getIsDoctor(),
   ]);
 
   const userName = profile?.name ?? "Usuário";
-  const score = healthScore ?? { overall: 0, metabolic: 0, cardiovascular: 0, lifestyle: 0, preventive: 0 };
-
-  function scoreColor(val: number) {
-    if (val >= 75) return { color: "#52B788", bg: "#1B4332", glow: "rgba(82,183,136,0.5)" };
-    if (val >= 50) return { color: "#F4A261", bg: "#2D1A06", glow: "rgba(244,162,97,0.5)" };
-    return { color: "#C1440E", bg: "#2D0A06", glow: "rgba(193,68,14,0.5)" };
-  }
-  const sc = scoreColor(score.overall);
 
   const historyBySlug = history.reduce<Record<string, { date_label: string; value: number }[]>>((acc, h) => {
     if (!acc[h.biomarker_slug]) acc[h.biomarker_slug] = [];
@@ -37,25 +39,47 @@ export default async function DashboardPage() {
     return acc;
   }, {});
 
-  const urgentReminders = reminders.filter(r => r.priority === "high").length;
+  // ── Score de Organização da Saúde (determinístico) ──────────────────────────
+  const comparableCount = Object.values(historyBySlug).filter((pts) => pts.length >= 2).length;
+  const signal: ScoreSignal = {
+    hasExam: documents.length > 0,
+    comparableCount,
+    hasLinkedDoctor: linkedDoctors.length > 0,
+    hasMeds: medications.length > 0,
+    hasFamilyHistory: familyHistory.length > 0,
+  };
+  const orgScore = computeOrganizationScore(signal);
 
-  const examTimestamps = documents.map(d => new Date(d.date).getTime()).filter(t => Number.isFinite(t));
-  const lastExamTs = examTimestamps.length ? Math.max(...examTimestamps) : null;
-  const lastExamDays = lastExamTs !== null ? Math.floor((Date.now() - lastExamTs) / 86400000) : null;
-  const lastExamValue = lastExamTs !== null ? new Date(lastExamTs).toLocaleDateString("pt-BR") : "—";
-  function lastExamRelative(days: number): string {
-    if (days <= 0) return "hoje";
-    if (days === 1) return "há 1 dia";
-    if (days < 30) return `há ${days} dias`;
-    if (days < 365) {
-      const months = Math.floor(days / 30);
-      return `há ${months} ${months === 1 ? "mês" : "meses"}`;
-    }
-    const years = Math.floor(days / 365);
-    return `há ${years} ano${years > 1 ? "s" : ""}`;
-  }
-  const lastExamSub = lastExamDays === null ? "nenhum exame" : lastExamRelative(lastExamDays);
-  const lastExamColor = lastExamTs === null ? "#5A5A50" : lastExamDays !== null && lastExamDays > 180 ? "#F4A261" : "#52B788";
+  // ── Último exame ────────────────────────────────────────────────────────────
+  const latestExamDate = documents[0]?.date ?? null;
+  const examFound = biomarkers.length;
+  const examOutOfRange = biomarkers.filter((b) => b.status !== "optimal").length;
+  const examRelevantChange = biomarkers.filter((b) => b.trend && b.trend !== "stable").length;
+
+  const nextAction = nextBestAction(signal, examOutOfRange);
+
+  // ── Biomarcadores ordenados (alertas primeiro) para o painel ────────────────
+  const statusOrder: Record<string, number> = { critical: 0, high: 1, low: 1, attention: 2, optimal: 3 };
+  const biomarkerItems = [...biomarkers]
+    .sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4))
+    .map((b) => ({
+      id: b.id, name: b.name, value: b.value, unit: b.unit, status: b.status, trend: b.trend,
+      category: b.category, lastDate: b.last_date, slug: b.slug,
+      history: (historyBySlug[b.slug] ?? []).map((h) => ({ date: h.date_label, value: h.value })),
+      reference: b.reference as Record<string, number>,
+    }));
+
+  // ── Tendências compactas (penúltimo → último) ───────────────────────────────
+  const compactTrends: CompactTrend[] = biomarkers
+    .filter((b) => (historyBySlug[b.slug]?.length ?? 0) >= 2)
+    .slice(0, 3)
+    .map((b) => {
+      const pts = historyBySlug[b.slug];
+      const from = pts[pts.length - 2].value;
+      const to = pts[pts.length - 1].value;
+      const direction: CompactTrend["direction"] = to > from ? "up" : to < from ? "down" : "stable";
+      return { name: b.name, from, to, unit: b.unit, direction, improving: b.status === "optimal" };
+    });
 
   const hasNonOptimal = biomarkers.some(b => b.status !== "optimal");
   const overdueDoctoralerts = doctors.filter(doc => {
@@ -76,60 +100,20 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold mt-1" style={{ color: "#E8E4D9" }}>
             Olá, {userName.split(" ")[0]} 👋
           </h1>
-          <p className="text-sm mt-1" style={{ color: "#9A9688" }}>Aqui está um resumo da sua saúde preventiva.</p>
+          <p className="text-sm mt-1" style={{ color: "#9A9688" }}>Sua saúde organizada em um só lugar.</p>
         </div>
 
-        {/* Score + Quick stats */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-          <div className="lg:col-span-1 p-6 rounded-3xl flex flex-col gap-4 relative overflow-hidden"
-            style={{ background: sc.bg }}>
-            <div className="absolute top-0 right-0 w-40 h-40 blur-3xl opacity-40 pointer-events-none"
-              style={{ background: `radial-gradient(ellipse, ${sc.glow} 0%, transparent 70%)` }} />
-            <p className="text-xs uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.5)" }}>Índice Preventivo</p>
-            <div className="flex items-end gap-2">
-              <span className="text-5xl font-bold text-white">{score.overall}</span>
-              <span className="text-lg mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>/100</span>
-            </div>
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.15)" }}>
-              <div className="h-full rounded-full" style={{ width: `${score.overall}%`, background: sc.color }} />
-            </div>
-            <div className="space-y-2 text-xs">
-              {[
-                { label: "Metabólico", val: score.metabolic },
-                { label: "Cardiovascular", val: score.cardiovascular },
-                { label: "Estilo de vida", val: score.lifestyle },
-                { label: "Preventivo", val: score.preventive }
-              ].map(c => (
-                <div key={c.label} className="flex items-center justify-between gap-2">
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>{c.label}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${c.val}%`, background: sc.color }} />
-                    </div>
-                    <span style={{ color: "rgba(255,255,255,0.5)" }} className="w-6 text-right">{c.val}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="lg:col-span-3 flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible sm:pb-0">
-            {[
-              { icon: FileText, label: "Documentos", value: String(documents.length), sub: `${documents.filter(d => d.status === "reviewed").length} revisados`, color: "#52B788" },
-              { icon: Activity, label: "Biomarcadores", value: String(biomarkers.length), sub: `${biomarkers.filter(b => b.status === "optimal").length} em dia`, color: "#52B788" },
-              { icon: Bell, label: "Lembretes", value: String(reminders.length), sub: `${urgentReminders} urgentes`, color: urgentReminders > 0 ? "#C1440E" : "#52B788" },
-              { icon: Clock, label: "Último exame", value: lastExamValue, sub: lastExamSub, color: lastExamColor }
-            ].map(({ icon: Icon, label, value, sub, color }) => (
-              <div key={label} className="shrink-0 w-36 sm:w-auto p-4 sm:p-5 rounded-3xl flex flex-col gap-2 sm:gap-3"
-                style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <Icon size={15} style={{ color }} />
-                <div>
-                  <p className="text-2xl font-bold" style={{ color: "#E8E4D9" }}>{value}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#5A5A50" }}>{sub}</p>
-                </div>
-                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: "#5A5A50" }}>{label}</p>
-              </div>
-            ))}
+        {/* Nova Home — grade de organização */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <HealthOrganizationScoreCard score={orgScore} nextAction={nextAction} />
+          <div className="flex flex-col gap-5">
+            <NextBestActionCard action={nextAction} />
+            <LatestExamSummaryCard
+              examDate={latestExamDate}
+              found={examFound}
+              outOfRange={examOutOfRange}
+              relevantChange={examRelevantChange}
+            />
           </div>
         </div>
 
@@ -164,61 +148,18 @@ export default async function DashboardPage() {
             action={{ label: "Enviar exame", href: "/documents" }}
           />
         )}
-        {biomarkers.length > 0 && (() => {
-          const statusOrder: Record<string, number> = { critical: 0, high: 1, low: 1, attention: 2, optimal: 3 };
-          const sorted = [...biomarkers].sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4));
-          return (
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Biomarcadores principais</h2>
-              <MetricsGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {sorted.map(b => (
-                  <HealthMetricCard
-                    key={b.id}
-                    name={b.name}
-                    value={b.value}
-                    unit={b.unit}
-                    status={b.status}
-                    trend={b.trend}
-                    category={b.category}
-                    lastDate={b.last_date}
-                    slug={b.slug}
-                    history={(historyBySlug[b.slug] ?? []).map(h => ({ date: h.date_label, value: h.value }))}
-                    reference={b.reference as Record<string, number>}
-                  />
-                ))}
-              </MetricsGrid>
-            </div>
-          );
-        })()}
+        {/* Biomarcadores principais — alertas primeiro, com expandir */}
+        <BiomarkerPanel items={biomarkerItems} />
 
-        {/* Tendências — mostra os mais relevantes (alterados primeiro) */}
-        {Object.keys(historyBySlug).length > 0 && (() => {
-          const statusOrder: Record<string, number> = { critical: 0, high: 1, low: 1, attention: 2, optimal: 3 };
-          const trendBiomarkers = biomarkers
-            .filter(bm => historyBySlug[bm.slug]?.length > 0)
-            .sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4))
-            .slice(0, 4);
-          if (!trendBiomarkers.length) return null;
-          return (
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Tendências</h2>
-              <MetricsGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {trendBiomarkers.map(bm => (
-                  <BiomarkerTrendCard
-                    key={bm.slug}
-                    slug={bm.slug}
-                    name={bm.name}
-                    value={Number(bm.value)}
-                    unit={bm.unit}
-                    status={bm.status}
-                    history={historyBySlug[bm.slug].map(h => ({ date: h.date_label, value: h.value }))}
-                    reference={bm.reference as Record<string, number>}
-                  />
-                ))}
-              </MetricsGrid>
-            </div>
-          );
-        })()}
+        {/* Cards secundários — depois dos biomarcadores */}
+        {biomarkers.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <CompactTrendsCard trends={compactTrends} />
+            <RoutineQuickCard />
+            <ConsultationReminderCard />
+            <ShareWithDoctorCard />
+          </div>
+        )}
 
         {/* Bottom grid — só exibe se houver dados */}
         {(reminders.length > 0 || documents.length > 0 || biomarkers.length > 0) && (
