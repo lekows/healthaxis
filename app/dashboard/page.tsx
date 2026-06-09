@@ -4,7 +4,7 @@ import { HealthMetricCard, BiomarkerTrendCard, MetricsGrid } from "@/components/
 import { PreventiveReminderCard, RiskAreaCard, RecentDocumentCard } from "@/components/dashboard/EventCards";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore, getDoctors } from "@/lib/supabase/queries";
-import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical, Stethoscope } from "lucide-react";
+import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical, Stethoscope, Upload } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default async function DashboardPage() {
@@ -112,13 +112,35 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* Banner de boas-vindas — primeiro acesso */}
+        {biomarkers.length === 0 && documents.length === 0 && (
+          <div className="rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5"
+            style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.18)" }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)" }}>
+              <Upload size={20} style={{ color: "#52B788" }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>Envie seu primeiro exame de sangue</p>
+              <p className="text-xs mt-1 leading-relaxed" style={{ color: "#9A9688" }}>
+                Faça upload de um laudo laboratorial real para extrair seus biomarcadores automaticamente e começar a monitorar sua saúde preventiva.
+              </p>
+            </div>
+            <Link href="/documents"
+              className="shrink-0 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-opacity hover:opacity-80"
+              style={{ background: "#52B788", color: "#0D0D0B" }}>
+              Enviar exame
+            </Link>
+          </div>
+        )}
+
         {/* Biomarcadores */}
-        {biomarkers.length === 0 && (
+        {biomarkers.length === 0 && documents.length > 0 && (
           <EmptyState
             icon={FlaskConical}
-            title="Nenhum exame registrado ainda"
-            description="Envie seu primeiro laudo laboratorial para começar a monitorar seus biomarcadores."
-            action={{ label: "Enviar primeiro exame", href: "/documents" }}
+            title="Nenhum biomarcador extraído ainda"
+            description="Envie um laudo laboratorial para começar a monitorar seus biomarcadores."
+            action={{ label: "Enviar exame", href: "/documents" }}
           />
         )}
         {biomarkers.length > 0 && (() => {
@@ -177,62 +199,70 @@ export default async function DashboardPage() {
           );
         })()}
 
-        {/* Bottom grid */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Lembretes preventivos</h2>
-            <div className="space-y-3">
-              {reminders.map(r => (
-                <PreventiveReminderCard
-                  key={r.id}
-                  title={r.title}
-                  description={r.description ?? ""}
-                  daysUntil={r.due_date ? Math.ceil((new Date(r.due_date).getTime() - Date.now()) / 86400000) : 0}
-                  priority={r.priority}
-                />
-              ))}
-            </div>
+        {/* Bottom grid — só exibe se houver dados */}
+        {(reminders.length > 0 || documents.length > 0 || biomarkers.length > 0) && (
+          <div className="grid lg:grid-cols-3 gap-6">
+            {reminders.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Lembretes preventivos</h2>
+                <div className="space-y-3">
+                  {reminders.map(r => (
+                    <PreventiveReminderCard
+                      key={r.id}
+                      title={r.title}
+                      description={r.description ?? ""}
+                      daysUntil={r.due_date ? Math.ceil((new Date(r.due_date).getTime() - Date.now()) / 86400000) : 0}
+                      priority={r.priority}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {documents.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Documentos recentes</h2>
+                <div className="space-y-2">
+                  {documents.slice(0, 4).map(d => (
+                    <RecentDocumentCard
+                      key={d.id}
+                      title={d.title}
+                      type={d.type}
+                      date={d.date}
+                      lab={d.lab ?? ""}
+                      status={d.status}
+                      tags={d.tags ?? []}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {biomarkers.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Áreas de atenção</h2>
+                <div className="space-y-3">
+                  {biomarkers.filter(b => b.status !== "optimal").map(b => (
+                    <RiskAreaCard
+                      key={b.id}
+                      label={b.name}
+                      score={70}
+                      description={`Valor atual: ${b.value} ${b.unit}. Monitorar.`}
+                      color="yellow"
+                    />
+                  ))}
+                  {biomarkers.filter(b => b.status === "optimal").slice(0, 2).map(b => (
+                    <RiskAreaCard
+                      key={b.id}
+                      label={b.name}
+                      score={90}
+                      description={`${b.value} ${b.unit} — dentro da faixa ideal.`}
+                      color="green"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Documentos recentes</h2>
-            <div className="space-y-2">
-              {documents.slice(0, 4).map(d => (
-                <RecentDocumentCard
-                  key={d.id}
-                  title={d.title}
-                  type={d.type}
-                  date={d.date}
-                  lab={d.lab ?? ""}
-                  status={d.status}
-                  tags={d.tags ?? []}
-                />
-              ))}
-            </div>
-          </div>
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Áreas de atenção</h2>
-            <div className="space-y-3">
-              {biomarkers.filter(b => b.status !== "optimal").map(b => (
-                <RiskAreaCard
-                  key={b.id}
-                  label={b.name}
-                  score={70}
-                  description={`Valor atual: ${b.value} ${b.unit}. Monitorar.`}
-                  color="yellow"
-                />
-              ))}
-              {biomarkers.filter(b => b.status === "optimal").slice(0, 2).map(b => (
-                <RiskAreaCard
-                  key={b.id}
-                  label={b.name}
-                  score={90}
-                  description={`${b.value} ${b.unit} — dentro da faixa ideal.`}
-                  color="green"
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Doctor alerts */}
         {overdueDoctoralerts.length > 0 && (

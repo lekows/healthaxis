@@ -58,7 +58,9 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
 
   const handleFileChange = (f: File | null) => {
     if (!f) return;
-    if (f.type !== "application/pdf" && !f.type.startsWith("image/")) {
+    const looksLikePdf = f.type === "application/pdf" ||
+      ((f.type === "application/octet-stream" || f.type === "") && f.name.toLowerCase().endsWith(".pdf"));
+    if (!looksLikePdf && !f.type.startsWith("image/")) {
       setError("Formato inválido. Use PDF, JPG ou PNG.");
       return;
     }

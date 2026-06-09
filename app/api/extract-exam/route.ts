@@ -254,7 +254,9 @@ export async function POST(req: NextRequest) {
       if (fileType && imageTypes.includes(fileType)) imageMediaType = fileType as typeof imageMediaType;
     } else {
       buffer = Buffer.from(await file!.arrayBuffer());
-      isPDF = file!.type === "application/pdf";
+      isPDF = file!.type === "application/pdf" ||
+        file!.name.toLowerCase().endsWith(".pdf") ||
+        (fileName?.toLowerCase().endsWith(".pdf") ?? false);
       if (imageTypes.includes(file!.type)) imageMediaType = file!.type as typeof imageMediaType;
     }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { updateUserRole, seedUserData } from "@/app/auth/actions";
+import { updateUserRole } from "@/app/auth/actions";
 
 export default function SetupPage() {
   const router = useRouter();
@@ -41,7 +41,6 @@ export default function SetupPage() {
     await updateUserRole(userId, role, crm || undefined);
 
     if (role === "patient") {
-      await seedUserData(userId);
       router.push("/dashboard");
     } else {
       router.push("/doctor/setup");
