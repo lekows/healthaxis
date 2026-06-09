@@ -58,6 +58,8 @@ export interface NextAction {
   label: string;
   href: string;
   description?: string;
+  tone?: "alert";
+  count?: number;
 }
 
 // Regras simples — só sugere ações com tela existente (Fase 1).
@@ -71,11 +73,12 @@ export function nextBestAction(signal: ScoreSignal, alteredCount = 0): NextActio
     };
   }
   if (alteredCount > 0) {
-    const plural = alteredCount > 1;
     return {
       label: "Falar com seu médico",
-      href: "/share",
-      description: `Você tem ${alteredCount} biomarcador${plural ? "es" : ""} alterado${plural ? "s" : ""}. Entre em contato com seu médico.`,
+      href: "/doctors",
+      tone: "alert",
+      count: alteredCount,
+      description: "Entre em contato com seu médico.",
     };
   }
   if (!signal.hasLinkedDoctor) {

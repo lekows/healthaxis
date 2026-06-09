@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Circle, Lock, Info } from "lucide-react";
+import { Check, X, Lock, Info } from "lucide-react";
 import type { OrganizationScore, NextAction } from "@/lib/health-organization-score";
 import { organizationLabel } from "@/lib/health-organization-score";
 
@@ -56,7 +56,9 @@ export function HealthOrganizationScoreCard({ score, nextAction }: Props) {
                 <Check size={12} style={{ color: "#0D0D0B" }} />
               </span>
             ) : (
-              <Circle size={16} style={{ color: "#5A5A50" }} />
+              <span className="flex items-center justify-center rounded-full" style={{ width: 18, height: 18, background: "rgba(193,68,14,0.15)", border: "1px solid rgba(193,68,14,0.4)" }}>
+                <X size={12} style={{ color: "#C1440E" }} />
+              </span>
             )}
             <span style={{ color: c.done ? "#E8E4D9" : "#9A9688" }}>{c.label}</span>
             {!c.available && (
