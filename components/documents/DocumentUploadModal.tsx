@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, Upload, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { X, Upload, CheckCircle, AlertTriangle, Loader2, FileText, Camera } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -35,9 +35,10 @@ function namesMismatch(profileName: string, examName: string): boolean {
 interface ModalProps { onClose: () => void; userName?: string; }
 
 function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
-  const router       = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const pendingOcr   = useRef<OCRExamData | null>(null);
+  const router        = useRouter();
+  const pdfInputRef   = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pendingOcr    = useRef<OCRExamData | null>(null);
   const pendingDocumentId = useRef<string | null>(null);
   const pendingStoragePath = useRef<string | null>(null);
 
@@ -342,14 +343,16 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
-            onClick={() => !loading && fileInputRef.current?.click()}
-            className="rounded-2xl border-2 border-dashed p-7 text-center transition-all"
+            className="rounded-2xl border-2 border-dashed p-6 text-center transition-all"
             style={{
               borderColor: dragOver ? "#52B788" : file ? "#52B78860" : "rgba(255,255,255,0.12)",
               background:  dragOver ? "rgba(82,183,136,0.05)" : file ? "rgba(82,183,136,0.04)" : "rgba(255,255,255,0.02)",
-              cursor: loading ? "default" : "pointer",
             }}>
-            <input ref={fileInputRef} type="file" accept="*/*" className="hidden"
+            {/* PDF: abre gerenciador de arquivos no Android */}
+            <input ref={pdfInputRef} type="file" accept="application/pdf,application/octet-stream,.pdf" className="hidden"
+              onChange={e => handleFileChange(e.target.files?.[0] ?? null)} />
+            {/* Imagem: abre galeria/câmera no Android */}
+            <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => handleFileChange(e.target.files?.[0] ?? null)} />
             {file ? (
               <div className="flex flex-col items-center gap-1.5">
@@ -358,11 +361,29 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
                 <p className="text-xs" style={{ color: "#5A5A50" }}>{(file.size / 1024).toFixed(0)} KB</p>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center gap-3">
                 <Upload size={22} style={{ color: "#5A5A50" }} />
                 <p className="text-sm" style={{ color: "#9A9688" }}>
-                  Arraste o arquivo aqui ou <span style={{ color: "#52B788" }}>clique para selecionar</span>
+                  Arraste o arquivo aqui ou selecione:
                 </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-40"
+                    style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.3)", color: "#52B788" }}>
+                    <FileText size={14} /> PDF / Documento
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-40"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", color: "#9A9688" }}>
+                    <Camera size={14} /> Foto / Imagem
+                  </button>
+                </div>
                 <p className="text-xs" style={{ color: "#5A5A50" }}>PDF, JPG ou PNG — máx 8 MB</p>
               </div>
             )}
