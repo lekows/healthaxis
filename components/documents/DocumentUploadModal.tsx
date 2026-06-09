@@ -58,9 +58,8 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
 
   const handleFileChange = (f: File | null) => {
     if (!f) return;
-    const looksLikePdf = f.type === "application/pdf" ||
-      ((f.type === "application/octet-stream" || f.type === "") && f.name.toLowerCase().endsWith(".pdf"));
-    if (!looksLikePdf && !f.type.startsWith("image/")) {
+    const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf && !f.type.startsWith("image/")) {
       setError("Formato inválido. Use PDF, JPG ou PNG.");
       return;
     }
@@ -355,7 +354,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
               background:  dragOver ? "rgba(82,183,136,0.05)" : file ? "rgba(82,183,136,0.04)" : "rgba(255,255,255,0.02)",
               cursor: loading ? "default" : "pointer",
             }}>
-            <input ref={fileInputRef} type="file" accept=".pdf,image/*" className="hidden"
+            <input ref={fileInputRef} type="file" accept=".pdf,application/pdf,application/octet-stream,image/*" className="hidden"
               onChange={e => handleFileChange(e.target.files?.[0] ?? null)} />
             {file ? (
               <div className="flex flex-col items-center gap-1.5">
