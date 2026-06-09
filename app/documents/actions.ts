@@ -237,6 +237,37 @@ export async function saveDoctor(data: {
   }
 }
 
+export async function deleteDocument(documentId: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Não autenticado" };
+
+  const { data: doc } = await supabase
+    .from("documents")
+    .select("file_url")
+    .eq("id", documentId)
+    .eq("user_id", user.id)
+    .single();
+
+  const { error } = await supabase
+    .from("documents")
+    .delete()
+    .eq("id", documentId)
+    .eq("user_id", user.id);
+
+  if (error) return { error: error.message };
+
+  if (doc?.file_url) {
+    const storagePath = doc.file_url.split("/exam-files/")[1]?.split("?")[0];
+    if (storagePath) await supabase.storage.from("exam-files").remove([storagePath]);
+  }
+
+  revalidatePath("/documents");
+  revalidatePath("/dashboard");
+  revalidatePath("/exams");
+  return {};
+}
+
 function toDateLabel(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];

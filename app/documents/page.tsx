@@ -5,6 +5,7 @@ import { getDocuments, getProfile } from "@/lib/supabase/queries";
 import { FolderOpen, FileText, FlaskConical, Image as ImageIcon, CheckCircle, Clock } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { UploadDocumentButton } from "@/components/documents/DocumentUploadModal";
+import { DeleteDocumentButton } from "@/components/documents/DeleteDocumentButton";
 
 const typeIcon: Record<string, React.ElementType> = {
   "Exame Laboratorial": FlaskConical,
@@ -67,6 +68,7 @@ export default async function DocumentsPage() {
                   <Badge variant={doc.status === "reviewed" ? "success" : "warning"}>
                     {doc.status === "reviewed" ? "✓" : "..."}
                   </Badge>
+                  <DeleteDocumentButton documentId={doc.id} documentTitle={doc.title} />
                 </div>
                 <div className="space-y-1 text-xs text-ink-faint mb-3">
                   <p>📍 {doc.lab}</p>
