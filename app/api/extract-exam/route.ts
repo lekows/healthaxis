@@ -250,14 +250,12 @@ export async function POST(req: NextRequest) {
       const resp = await fetch(fileUrl);
       if (!resp.ok) return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
       buffer = Buffer.from(await resp.arrayBuffer());
-      isPDF = fileType === "application/pdf" || fileUrl.toLowerCase().split("?")[0].endsWith(".pdf");
-      if (fileType && imageTypes.includes(fileType)) imageMediaType = fileType as typeof imageMediaType;
+      isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
+      if (!isPDF && fileType && imageTypes.includes(fileType)) imageMediaType = fileType as typeof imageMediaType;
     } else {
       buffer = Buffer.from(await file!.arrayBuffer());
-      isPDF = file!.type === "application/pdf" ||
-        file!.name.toLowerCase().endsWith(".pdf") ||
-        (fileName?.toLowerCase().endsWith(".pdf") ?? false);
-      if (imageTypes.includes(file!.type)) imageMediaType = file!.type as typeof imageMediaType;
+      isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
+      if (!isPDF && imageTypes.includes(file!.type)) imageMediaType = file!.type as typeof imageMediaType;
     }
 
     const client = new Anthropic();
