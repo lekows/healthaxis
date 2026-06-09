@@ -57,12 +57,40 @@ export function organizationLabel(percent: number): string {
 export interface NextAction {
   label: string;
   href: string;
+  description?: string;
 }
 
 // Regras simples — só sugere ações com tela existente (Fase 1).
-export function nextBestAction(signal: ScoreSignal): NextAction | null {
-  if (!signal.hasExam) return { label: "Enviar primeiro exame", href: "/documents" };
-  if (!signal.hasLinkedDoctor) return { label: "Compartilhar com seu médico", href: "/doctors" };
-  if (signal.comparableCount < 2) return { label: "Adicione outro exame para ver tendências", href: "/documents" };
+// `alteredCount` = nº de biomarcadores fora da faixa de referência.
+export function nextBestAction(signal: ScoreSignal, alteredCount = 0): NextAction | null {
+  if (!signal.hasExam) {
+    return {
+      label: "Enviar primeiro exame",
+      href: "/documents",
+      description: "Faça upload de um laudo para extrair seus biomarcadores automaticamente.",
+    };
+  }
+  if (alteredCount > 0) {
+    const plural = alteredCount > 1;
+    return {
+      label: "Falar com seu médico",
+      href: "/share",
+      description: `Você tem ${alteredCount} biomarcador${plural ? "es" : ""} alterado${plural ? "s" : ""}. Entre em contato com seu médico.`,
+    };
+  }
+  if (!signal.hasLinkedDoctor) {
+    return {
+      label: "Compartilhar com seu médico",
+      href: "/doctors",
+      description: "Vincule seu médico para que ele acompanhe seus exames.",
+    };
+  }
+  if (signal.comparableCount < 2) {
+    return {
+      label: "Adicionar outro exame",
+      href: "/documents",
+      description: "Com dois exames comparáveis você passa a ver tendências ao longo do tempo.",
+    };
+  }
   return null;
 }

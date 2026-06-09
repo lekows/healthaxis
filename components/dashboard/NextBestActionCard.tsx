@@ -22,7 +22,7 @@ export function NextBestActionCard({ action }: Props) {
         <>
           <p className="text-lg font-bold leading-snug" style={{ color: "#E8E4D9" }}>{action.label}</p>
           <p className="text-sm leading-relaxed" style={{ color: "#9A9688" }}>
-            Complete seus dados para gerar relatórios melhores e chegar mais preparado à consulta.
+            {action.description ?? "Complete seus dados para gerar relatórios melhores e chegar mais preparado à consulta."}
           </p>
           <Link href={action.href}
             className="w-full py-3 rounded-2xl text-sm font-semibold text-center transition-opacity hover:opacity-90"
