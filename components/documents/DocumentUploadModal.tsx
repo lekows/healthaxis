@@ -206,13 +206,23 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
       if (file) {
         const supabase = createClient();
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        const ext  = file.name.split(".").pop() ?? "pdf";
+        const nameParts = file.name.split(".");
+        const ext = nameParts.length > 1 ? (nameParts.pop() ?? "pdf") : "pdf";
         const path = `${authUser?.id ?? "anon"}/${Date.now()}.${ext}`;
         pendingStoragePath.current = path;
+        const contentType = (file.type && file.type !== "application/octet-stream")
+          ? file.type
+          : ext === "pdf" ? "application/pdf" : "application/octet-stream";
         const { data: up, error: upErr } = await supabase.storage
           .from("exam-files")
-          .upload(path, file, { upsert: false });
-        if (!upErr && up) {
+          .upload(path, file, { upsert: false, contentType });
+        if (upErr) {
+          pendingStoragePath.current = null;
+          setError("Falha ao enviar o arquivo. Verifique sua conexão e tente novamente.");
+          setLoading(false);
+          return;
+        }
+        if (up) {
           const { data: urlData } = supabase.storage.from("exam-files").getPublicUrl(up.path);
           fileUrl = urlData.publicUrl;
         }
