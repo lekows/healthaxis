@@ -67,7 +67,15 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    handleFileChange(e.dataTransfer.files[0] ?? null);
+    const f = e.dataTransfer.files[0] ?? null;
+    if (f && (f.name.includes("drivesdk") || f.name.startsWith("view?") || f.size === 0)) {
+      setError(
+        "Arquivos do Google Drive não podem ser arrastados diretamente. " +
+        "Abra o PDF no Drive → ⋮ → Download para salvar no dispositivo, depois use o botão PDF / Documento."
+      );
+      return;
+    }
+    handleFileChange(f);
   };
 
   const saveOcrResults = async (data: OCRExamData) => {
@@ -378,10 +386,8 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
               borderColor: dragOver ? "#52B788" : file ? "#52B78860" : "rgba(255,255,255,0.12)",
               background:  dragOver ? "rgba(82,183,136,0.05)" : file ? "rgba(82,183,136,0.04)" : "rgba(255,255,255,0.02)",
             }}>
-            {/* PDF: abre gerenciador de arquivos no Android */}
-            <input ref={pdfInputRef} type="file" accept="application/pdf,application/octet-stream,.pdf" className="hidden"
+            <input ref={pdfInputRef} type="file" accept="*/*" className="hidden"
               onChange={e => handleFileChange(e.target.files?.[0] ?? null)} />
-            {/* Imagem: abre galeria/câmera no Android */}
             <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => handleFileChange(e.target.files?.[0] ?? null)} />
             {file ? (
@@ -415,6 +421,15 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
                   </button>
                 </div>
                 <p className="text-xs" style={{ color: "#5A5A50" }}>PDF, JPG ou PNG — máx 8 MB</p>
+                <p className="text-xs" style={{ color: "#5A5A50" }}>
+                  Samsung: em "PDF / Documento" navegue até <strong style={{ color: "#9A9688" }}>Meus Arquivos</strong>
+                </p>
+                <p className="text-xs" style={{ color: "#5A5A50" }}>
+                  Usa Google Drive? Copie o texto do PDF e use{" "}
+                  <button type="button" onClick={() => setInputMode("text")} style={{ color: "#52B788", background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 500 }}>
+                    Colar texto
+                  </button>
+                </p>
               </div>
             )}
           </div>
