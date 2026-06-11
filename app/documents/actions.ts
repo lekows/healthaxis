@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getReference, inferStatus } from "@/lib/biomarker-references";
+import {
+  computeDimensionScores, computeLifestyleScore, computeOverall,
+  computeTrend, deriveReminders, resolvedReminderTitles,
+  type BiomarkerStatus,
+} from "@/lib/health-derivation";
 
 type ActionResult = { error?: string; duplicate?: boolean; id?: string };
 
@@ -111,11 +116,30 @@ export async function saveExamBiomarkers(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Sessão expirada." };
 
-    const { data: profile } = await supabase.from("profiles").select("sex, dob").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("sex, dob, weight, height").eq("id", user.id).single();
     const sex = (profile?.sex as string | null) ?? null;
     const ageYears = profile?.dob
       ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25 * 24 * 3600 * 1000))
       : null;
+
+    const { data: existing } = await supabase
+      .from("biomarker_history")
+      .select("biomarker_slug, recorded_at, value")
+      .eq("user_id", user.id);
+
+    const priorValue = (slug: string, embedded: { data: string; valor: number }[]): number | null => {
+      const candidates = [
+        ...(existing ?? [])
+          .filter((r) => r.biomarker_slug === slug && r.recorded_at < examDate)
+          .map((r) => ({ date: r.recorded_at as string, value: Number(r.value) })),
+        ...embedded
+          .filter((h) => h.data < examDate)
+          .map((h) => ({ date: h.data, value: h.valor })),
+      ];
+      if (candidates.length === 0) return null;
+      candidates.sort((a, b) => (a.date < b.date ? 1 : -1));
+      return candidates[0].value;
+    };
 
     const resolved = entries.map((e) => {
       const hasLabRef = e.ref_min !== null || e.ref_max !== null;
@@ -126,6 +150,7 @@ export async function saveExamBiomarkers(
         // Quando o laudo forneceu faixas de referência, confiar no status calculado pelo OCR.
         // Usar referência estática apenas como fallback quando o laudo não tem faixas.
         status: hasLabRef ? e.status : (staticRef ? inferStatus(e.value, staticRef) : e.status),
+        trend: computeTrend(e.value, priorValue(e.slug, e.historico ?? [])),
       };
     });
 
@@ -139,7 +164,7 @@ export async function saveExamBiomarkers(
         value:     String(e.value),
         reference: e.reference,
         status:    e.status,
-        trend:     "stable",
+        trend:     e.trend,
         last_date: examDate,
       })),
       { onConflict: "user_id,slug" }
@@ -156,12 +181,8 @@ export async function saveExamBiomarkers(
       ),
     ];
 
-    // Dedup sem depender de unique constraint no banco: busca pontos já gravados e
-    // insere só os que faltam. Idempotente — reenviar o mesmo laudo não duplica.
-    const { data: existing } = await supabase
-      .from("biomarker_history")
-      .select("biomarker_slug, recorded_at")
-      .eq("user_id", user.id);
+    // Dedup sem depender de unique constraint no banco: pontos já gravados foram
+    // buscados acima; insere só os que faltam. Idempotente — reenviar o mesmo laudo não duplica.
     const seen = new Set((existing ?? []).map((r) => `${r.biomarker_slug}|${r.recorded_at}`));
 
     const toInsert = allPoints
@@ -184,8 +205,70 @@ export async function saveExamBiomarkers(
       if (histErr) return { error: histErr.message };
     }
 
+    // Derivação best-effort: o exame já foi salvo, falha aqui não pode quebrar o upload.
+    try {
+      const { data: allBiomarkers } = await supabase
+        .from("biomarkers")
+        .select("name, category, status")
+        .eq("user_id", user.id);
+
+      const dims = computeDimensionScores(
+        (allBiomarkers ?? []).map((b) => ({ category: b.category, status: b.status as BiomarkerStatus }))
+      );
+      const lifestyle = computeLifestyleScore(
+        profile?.weight ? Number(profile.weight) : null,
+        profile?.height ? Number(profile.height) : null
+      );
+
+      let storedLifestyle = lifestyle;
+      if (lifestyle === null) {
+        const { data: currentScore } = await supabase
+          .from("health_scores").select("lifestyle").eq("user_id", user.id).maybeSingle();
+        storedLifestyle = currentScore?.lifestyle ?? 0;
+      }
+
+      const overall = computeOverall({ ...dims, lifestyle });
+      const scores = {
+        overall,
+        metabolic:      dims.metabolic ?? 0,
+        cardiovascular: dims.cardiovascular ?? 0,
+        preventive:     dims.preventive ?? 0,
+        lifestyle:      storedLifestyle ?? 0,
+      };
+
+      await supabase.from("health_scores").upsert(
+        { user_id: user.id, ...scores, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+
+      await supabase.from("health_scores_history").upsert(
+        { user_id: user.id, ...scores, recorded_at: examDate, date_label: dateLabel },
+        { onConflict: "user_id,recorded_at" }
+      );
+
+      const statusEntries = resolved.map((e) => ({ name: e.name, status: e.status as BiomarkerStatus }));
+      const reminders = deriveReminders(statusEntries, examDate);
+      if (reminders.length > 0) {
+        await supabase.from("preventive_reminders").upsert(
+          reminders.map((r) => ({ user_id: user.id, ...r, done: false })),
+          { onConflict: "user_id,title" }
+        );
+      }
+
+      const resolvedTitles = resolvedReminderTitles(statusEntries);
+      if (resolvedTitles.length > 0) {
+        await supabase.from("preventive_reminders")
+          .update({ done: true })
+          .eq("user_id", user.id)
+          .in("title", resolvedTitles);
+      }
+    } catch (derivErr) {
+      console.error("Falha na derivação pós-upload:", derivErr);
+    }
+
     revalidatePath("/exams");
     revalidatePath("/dashboard");
+    revalidatePath("/overview");
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erro inesperado ao salvar biomarcadores." };
