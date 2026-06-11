@@ -14,7 +14,7 @@ type ActionResult = { error?: string; duplicate?: boolean; id?: string };
 export async function createDocument(data: {
   title: string;
   type: string;
-  lab: string;
+  lab: string | null;
   date: string;
   tags: string[];
   file_url: string | null;
@@ -29,7 +29,7 @@ export async function createDocument(data: {
       user_id:  user.id,
       title:    data.title,
       type:     data.type,
-      lab:      data.lab,
+      lab:      data.lab?.trim() || null,
       date:     data.date,
       tags:     data.tags,
       file_url: data.file_url,
