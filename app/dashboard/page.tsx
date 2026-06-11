@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { HealthMetricCard, BiomarkerTrendCard, MetricsGrid } from "@/components/dashboard/MetricCards";
 import { PreventiveReminderCard, RiskAreaCard, RecentDocumentCard } from "@/components/dashboard/EventCards";
+import { CollapsibleList } from "@/components/dashboard/CollapsibleList";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore, getDoctors } from "@/lib/supabase/queries";
 import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical, Stethoscope, Upload } from "lucide-react";
@@ -205,8 +206,9 @@ export default async function DashboardPage() {
             {reminders.length > 0 && (
               <div>
                 <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Lembretes preventivos</h2>
-                <div className="space-y-3">
-                  {reminders.map(r => (
+                <CollapsibleList
+                  limit={3}
+                  items={reminders.map(r => (
                     <PreventiveReminderCard
                       key={r.id}
                       title={r.title}
@@ -215,7 +217,7 @@ export default async function DashboardPage() {
                       priority={r.priority}
                     />
                   ))}
-                </div>
+                />
               </div>
             )}
             {documents.length > 0 && (
@@ -239,26 +241,29 @@ export default async function DashboardPage() {
             {biomarkers.length > 0 && (
               <div>
                 <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "#5A5A50" }}>Áreas de atenção</h2>
-                <div className="space-y-3">
-                  {biomarkers.filter(b => b.status !== "optimal").map(b => (
-                    <RiskAreaCard
-                      key={b.id}
-                      label={b.name}
-                      score={70}
-                      description={`Valor atual: ${b.value} ${b.unit}. Monitorar.`}
-                      color="yellow"
-                    />
-                  ))}
-                  {biomarkers.filter(b => b.status === "optimal").slice(0, 2).map(b => (
-                    <RiskAreaCard
-                      key={b.id}
-                      label={b.name}
-                      score={90}
-                      description={`${b.value} ${b.unit} — dentro da faixa ideal.`}
-                      color="green"
-                    />
-                  ))}
-                </div>
+                <CollapsibleList
+                  limit={3}
+                  items={[
+                    ...biomarkers.filter(b => b.status !== "optimal").map(b => (
+                      <RiskAreaCard
+                        key={b.id}
+                        label={b.name}
+                        score={70}
+                        description={`Valor atual: ${b.value} ${b.unit}. Monitorar.`}
+                        color="yellow"
+                      />
+                    )),
+                    ...biomarkers.filter(b => b.status === "optimal").slice(0, 2).map(b => (
+                      <RiskAreaCard
+                        key={b.id}
+                        label={b.name}
+                        score={90}
+                        description={`${b.value} ${b.unit} — dentro da faixa ideal.`}
+                        color="green"
+                      />
+                    )),
+                  ]}
+                />
               </div>
             )}
           </div>
