@@ -189,7 +189,6 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
 
   const handleSave = async () => {
     if (!title.trim()) { setError("Informe o título do documento."); return; }
-    if (!lab.trim())   { setError("Informe o laboratório."); return; }
     setLoading(true);
     setError(null);
     setNameWarning(null);
@@ -482,9 +481,9 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: "#9A9688" }}>Laboratório *</label>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "#9A9688" }}>Laboratório</label>
               <input value={lab} onChange={e => setLab(e.target.value)}
-                placeholder="ex: Fleury, Sabin, DASA" disabled={loading}
+                placeholder="ex: Fleury, Sabin, DASA (opcional)" disabled={loading}
                 className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none"
                 style={{ background: "#1C1C19", border: "1px solid rgba(255,255,255,0.08)", color: "#E8E4D9" }} />
             </div>

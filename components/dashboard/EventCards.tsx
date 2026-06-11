@@ -123,7 +123,7 @@ export function RecentDocumentCard({ title, type, date, lab, status, tags }: Doc
           }
         </div>
         <p className="text-xs mt-0.5" style={{ color: "#5A5A50" }}>
-          {lab} · {new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+          {lab ? `${lab} · ` : ""}{new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
         </p>
         <div className="flex gap-1 mt-2 flex-wrap">
           {tags.slice(0, 2).map(t => (
