@@ -201,6 +201,37 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
+  // documentId is set inside the try once the form is parsed.
+  // bump/finalizeExtraction are defined here so the catch block can call finalizeExtraction.
+  let documentId: string | null = null;
+
+  const bump = (progress: number, message: string) => {
+    if (!documentId) return;
+    supabase.from("documents").update({
+      extraction_status: "processing",
+      extraction_progress: progress,
+      extraction_message: message,
+    }).eq("id", documentId).eq("user_id", user.id).then(() => {});
+  };
+
+  const finalizeExtraction = async (success: boolean, errorMsg?: string) => {
+    if (!documentId) return;
+    if (success) {
+      await supabase.from("documents").update({
+        status: "reviewed",
+        extraction_status: "processed",
+        extraction_progress: 100,
+        extraction_message: "Exame processado com sucesso.",
+        extracted_at: new Date().toISOString(),
+      }).eq("id", documentId).eq("user_id", user.id);
+    } else {
+      supabase.from("documents").update({
+        extraction_status: "error",
+        extraction_error: errorMsg ?? "Erro desconhecido.",
+      }).eq("id", documentId).eq("user_id", user.id).then(() => {});
+    }
+  };
+
   try {
     const form = await req.formData();
     const pastedText = form.get("text") as string | null;
@@ -210,6 +241,7 @@ export async function POST(req: NextRequest) {
     const fileUrl = form.get("file_url") as string | null;
     const fileType = form.get("file_type") as string | null;
     const fileName = form.get("file_name") as string | null;
+    documentId = form.get("document_id") as string | null;
 
     if (!file && !pastedText && !fileUrl) return NextResponse.json({ error: "Arquivo ou texto ausente" }, { status: 400 });
     if (file && file.size > 8 * 1024 * 1024) {
@@ -220,11 +252,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ resultados: [], ocr_error: "Serviço de análise não configurado." });
     }
 
+    bump(5, "Iniciando análise…");
+
     // Texto colado pelo usuário — caminho direto, zero tokens de ruído de PDF
     if (pastedText && pastedText.trim().length > 10) {
       const client = new Anthropic();
       const truncated = pastedText.length > 12000 ? pastedText.substring(0, 12000) : pastedText;
       console.log(`[extract-exam] Texto colado (${pastedText.length} chars). Usando texto direto.`);
+      bump(30, "Enviando para análise…");
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: MAX_OUTPUT_TOKENS,
@@ -233,7 +268,9 @@ export async function POST(req: NextRequest) {
       });
       const block = msg.content[0];
       const responseText = block.type === "text" ? block.text : "";
+      bump(90, "Interpretando resultados…");
       const examData = parseResponse(responseText);
+      await finalizeExtraction(true);
       return NextResponse.json({
         ...examData,
         identificador_externo: examData.identificador_externo ?? extractKnownExternalIdentifier(pastedText),
@@ -254,10 +291,14 @@ export async function POST(req: NextRequest) {
         resp = await fetch(fileUrl, { signal: ctrl.signal });
       } catch {
         clearTimeout(storageTimeout);
+        await finalizeExtraction(false, "Tempo limite ao baixar o arquivo.");
         return NextResponse.json({ resultados: [], ocr_error: "Tempo limite ao baixar o arquivo. Tente novamente." });
       }
       clearTimeout(storageTimeout);
-      if (!resp.ok) return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
+      if (!resp.ok) {
+        await finalizeExtraction(false, "Não foi possível baixar o arquivo.");
+        return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
+      }
       buffer = Buffer.from(await resp.arrayBuffer());
       isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
       if (!isPDF && fileType && imageTypes.includes(fileType)) imageMediaType = fileType as typeof imageMediaType;
@@ -266,6 +307,7 @@ export async function POST(req: NextRequest) {
       isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
       if (!isPDF && imageTypes.includes(file!.type)) imageMediaType = file!.type as typeof imageMediaType;
     }
+    bump(20, "Arquivo recebido…");
 
     const client = new Anthropic();
     let responseText = "";
@@ -285,6 +327,7 @@ export async function POST(req: NextRequest) {
           ? pdfText.substring(0, 60000) + "\n\n[...]\n\n" + pdfText.substring(pdfText.length - 25000)
           : pdfText;
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
+        bump(35, "Enviando para análise…");
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
           max_tokens: MAX_OUTPUT_TOKENS,
@@ -299,6 +342,7 @@ export async function POST(req: NextRequest) {
       } else {
         // PDF escaneado — envia como documento via beta
         console.log("[extract-exam] PDF escaneado. Usando visão.");
+        bump(28, "Enviando PDF para visão computacional…");
         const base64 = buffer.toString("base64");
         const msg = await client.beta.messages.create({
           model: "claude-haiku-4-5-20251001",
@@ -318,6 +362,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Imagem (JPG, PNG, WebP)
+      bump(28, "Enviando imagem para análise…");
       const base64 = buffer.toString("base64");
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
@@ -335,9 +380,11 @@ export async function POST(req: NextRequest) {
       responseText = block.type === "text" ? block.text : "";
     }
 
+    bump(90, "Interpretando resultados…");
     console.log("[extract-exam] responseText (primeiros 800 chars):", responseText.substring(0, 800));
     const examData = parseResponse(responseText);
     console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
+    await finalizeExtraction(true);
     return NextResponse.json({
       ...examData,
       identificador_externo: deterministicIdentifier ?? examData.identificador_externo,
@@ -350,6 +397,7 @@ export async function POST(req: NextRequest) {
     const msg = isRateLimit
       ? "Limite de requisições atingido. Aguarde 1 minuto e tente novamente."
       : raw;
+    await finalizeExtraction(false, msg);
     return NextResponse.json({ resultados: [], ocr_error: msg });
   }
 }

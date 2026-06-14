@@ -56,6 +56,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const [loading, setLoading]         = useState(false);
   const [loadingMsg, setLoadingMsg]   = useState("");
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrMsg, setOcrMsg]           = useState("");
   const [error, setError]             = useState<string | null>(null);
   const [nameWarning, setNameWarning] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<(ImportSummary & { examDate: string | null }) | null>(null);
@@ -67,15 +68,37 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   }, [importSummary, onClose]);
 
   useEffect(() => {
-    if (loadingMsg !== "Analisando exame…") { setOcrProgress(0); return; }
+    if (loadingMsg !== "Analisando exame…") {
+      setOcrProgress(0);
+      setOcrMsg("");
+      return;
+    }
+    // Timer de fallback: avança até 25% enquanto o primeiro bump do servidor não chega.
     const start = Date.now();
-    const DURATION = 55000;
-    const id = setInterval(() => {
-      const t = Math.min((Date.now() - start) / DURATION, 0.99);
-      // Ease-out: fast start, slows near the end
-      setOcrProgress(Math.round((1 - Math.pow(1 - t, 1.6)) * 99));
-    }, 300);
-    return () => clearInterval(id);
+    const timerId = setInterval(() => {
+      const t = Math.min((Date.now() - start) / 30000, 1);
+      setOcrProgress(p => Math.max(p, Math.round((1 - Math.pow(1 - t, 2)) * 25)));
+    }, 500);
+
+    const docId = pendingDocumentId.current;
+    if (!docId) return () => clearInterval(timerId);
+
+    const supabase = createClient();
+    const poll = async () => {
+      const { data } = await supabase
+        .from("documents")
+        .select("extraction_progress, extraction_message")
+        .eq("id", docId)
+        .maybeSingle();
+      if (data?.extraction_progress != null && data.extraction_progress > 0) {
+        setOcrProgress(p => Math.max(p, data.extraction_progress ?? 0));
+      }
+      if (data?.extraction_message) setOcrMsg(data.extraction_message);
+    };
+
+    poll();
+    const pollId = setInterval(poll, 1500);
+    return () => { clearInterval(timerId); clearInterval(pollId); };
   }, [loadingMsg]);
 
   const handleFileChange = (f: File | null) => {
@@ -308,6 +331,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         setLoadingMsg("Analisando exame…");
         try {
           const fd = new FormData();
+          if (pendingDocumentId.current) fd.append("document_id", pendingDocumentId.current);
           if (inputMode === "text") {
             fd.append("text", pastedText.trim());
           } else if (fileUrl) {
@@ -614,12 +638,14 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
                 style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)" }}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm" style={{ color: "#52B788" }}>
-                    {ocrProgress < 12 ? "Lendo o documento…"
-                      : ocrProgress < 32 ? "Identificando biomarcadores…"
-                      : ocrProgress < 56 ? "Verificando referências laboratoriais…"
-                      : ocrProgress < 76 ? "Organizando histórico clínico…"
-                      : ocrProgress < 90 ? "Quase pronto…"
-                      : "Finalizando…"}
+                    {ocrMsg || (
+                      ocrProgress < 15 ? "Iniciando análise…"
+                      : ocrProgress < 35 ? "Identificando biomarcadores…"
+                      : ocrProgress < 60 ? "Verificando referências laboratoriais…"
+                      : ocrProgress < 80 ? "Organizando histórico clínico…"
+                      : ocrProgress < 92 ? "Quase pronto…"
+                      : "Finalizando…"
+                    )}
                   </span>
                   <span className="text-xs font-mono tabular-nums" style={{ color: "#5A5A50" }}>{ocrProgress}%</span>
                 </div>
@@ -627,7 +653,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
                   <div className="h-full rounded-full" style={{
                     width: `${ocrProgress}%`,
                     background: "linear-gradient(90deg, #52B788, #6fcfa0)",
-                    transition: "width 0.3s ease-out",
+                    transition: "width 0.4s ease-out",
                   }} />
                 </div>
               </div>
