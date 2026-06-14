@@ -50,6 +50,33 @@ Campo type:
 
 const METABOLIC_CATEGORIES = ["Glicemia", "Lipídios", "Função Hepática", "Função Renal", "Hormônios", "Inflamação"];
 
+// Recupera os padrões completos de um JSON truncado por estouro de tokens.
+// Mantém apenas os objetos do array "patterns" que fecham corretamente.
+function salvageTruncatedPatterns(text: string): { patterns: unknown[]; notes: string; confidence: number } | null {
+  const start = text.indexOf('"patterns"');
+  if (start === -1) return null;
+  const arrStart = text.indexOf("[", start);
+  if (arrStart === -1) return null;
+
+  const patterns: unknown[] = [];
+  let depth = 0;
+  let objStart = -1;
+  for (let i = arrStart + 1; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{") { if (depth === 0) objStart = i; depth++; }
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objStart !== -1) {
+        try { patterns.push(JSON.parse(text.slice(objStart, i + 1))); } catch { /* item parcial, ignora */ }
+        objStart = -1;
+      }
+    } else if (ch === "]" && depth === 0) break;
+  }
+
+  if (patterns.length === 0) return null;
+  return { patterns, notes: "", confidence: 0.7 };
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -138,12 +165,12 @@ export async function POST(req: NextRequest) {
     const client = new Anthropic();
     const response = await client.messages.create({
       model: HAIKU,
-      max_tokens: 3000,
+      max_tokens: 6000,
       system: SYSTEM,
       messages: [
         {
           role: "user",
-          content: `Analise os seguintes biomarcadores metabólicos e identifique padrões bioquímicos relevantes. Quando houver histórico, comente a evolução temporal:\n\n${biomarkerSummary}`,
+          content: `Analise os seguintes biomarcadores metabólicos e identifique padrões bioquímicos relevantes. Quando houver histórico, comente a evolução temporal.\n\nIMPORTANTE: summary deve ter 1 frase. description deve ter no máximo 3 frases. notes deve ter no máximo 2 frases. Seja conciso para não truncar o JSON.\n\n${biomarkerSummary}`,
         },
       ],
     });
@@ -160,10 +187,15 @@ export async function POST(req: NextRequest) {
     };
 
     if (textBlock?.type === "text") {
+      const jsonStr = textBlock.text.match(/\{[\s\S]*\}/)?.[0] ?? "{}";
       try {
-        output = JSON.parse(textBlock.text.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+        output = JSON.parse(jsonStr);
       } catch {
-        output.notes = textBlock.text;
+        // JSON truncado (estouro de tokens): salva os padrões completos
+        // recortando o array antes do último item incompleto.
+        const salvaged = salvageTruncatedPatterns(textBlock.text);
+        if (salvaged) output = salvaged;
+        else output.notes = "Análise gerada, mas resposta incompleta. Tente reanalisar.";
       }
     }
 
