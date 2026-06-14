@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 
-// Laudos grandes (49 páginas, ~56 biomarcadores com histórico) geram respostas longas
-// que levam dezenas de segundos — precisa de janela maior que o default da função.
-export const maxDuration = 60;
+// Laudos grandes geram respostas longas — janela generosa para não cortar no meio do JSON.
+// salvageObjects() recupera objetos completos mesmo se a resposta for truncada.
+export const maxDuration = 120;
 
-// Output amplo: um laudo Sabin completo com histórico chega a ~10k tokens de JSON.
-// 8192 truncava a resposta no meio do JSON e o parse falhava ("resposta vazia").
-const MAX_OUTPUT_TOKENS = 16000;
+// 8192 truncava respostas de laudos Sabin de 49 páginas com histórico extenso.
+// 12000 é o ponto de equilíbrio: cobre ~50 biomarcadores com histórico sem timeout.
+const MAX_OUTPUT_TOKENS = 12000;
 
 const IDENTIFIER_PROMPT = `Extraia tambem identificador_externo: { tipo: string, valor: string } quando houver
 OS, ordem de servico, pedido, protocolo, atendimento, accession number ou numero do laudo.
@@ -247,7 +247,16 @@ export async function POST(req: NextRequest) {
     let imageMediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/jpeg";
 
     if (fileUrl) {
-      const resp = await fetch(fileUrl);
+      const ctrl = new AbortController();
+      const storageTimeout = setTimeout(() => ctrl.abort(), 20000);
+      let resp: Response;
+      try {
+        resp = await fetch(fileUrl, { signal: ctrl.signal });
+      } catch {
+        clearTimeout(storageTimeout);
+        return NextResponse.json({ resultados: [], ocr_error: "Tempo limite ao baixar o arquivo. Tente novamente." });
+      }
+      clearTimeout(storageTimeout);
       if (!resp.ok) return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
       buffer = Buffer.from(await resp.arrayBuffer());
       isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
@@ -268,10 +277,13 @@ export async function POST(req: NextRequest) {
 
       if (pdfText) {
         deterministicIdentifier = extractKnownExternalIdentifier(pdfText) ?? deterministicIdentifier;
-        // PDF digital com texto selecionável — envia o texto completo (até 120k chars). A tabela
-        // LAUDO COMPARATIVO de laudos Sabin/Fleury/DASA fica na última página (~75k chars num laudo
-        // de 49 páginas), então o limite precisa cobrir o documento inteiro para capturar o histórico.
-        const truncated = pdfText.length > 120000 ? pdfText.substring(0, 120000) : pdfText;
+        // Para laudos muito grandes (ex: Sabin 49 páginas ≈ 120k chars), a tabela comparativa
+        // fica nas últimas páginas. Estratégia head+tail: primeiros 60k + últimos 25k chars,
+        // cobrindo resultados e histórico sem estourar o timeout do gateway (504).
+        const LIMIT = 85000;
+        const truncated = pdfText.length > LIMIT
+          ? pdfText.substring(0, 60000) + "\n\n[...]\n\n" + pdfText.substring(pdfText.length - 25000)
+          : pdfText;
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
