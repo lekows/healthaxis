@@ -150,29 +150,41 @@ export async function saveExamBiomarkers(
       return {
         ...e,
         reference: staticRef ?? e.reference,
-        // Quando o laudo forneceu faixas de referência, confiar no status calculado pelo OCR.
-        // Usar referência estática apenas como fallback quando o laudo não tem faixas.
         status: hasLabRef ? e.status : (staticRef ? inferStatus(e.value, staticRef) : e.status),
         trend: computeTrend(e.value, priorValue(e.slug, e.historico ?? [])),
       };
     });
 
-    const { error: upsertErr } = await supabase.from("biomarkers").upsert(
-      resolved.map((e) => ({
-        user_id:   user.id,
-        slug:      e.slug,
-        name:      e.name,
-        category:  e.category,
-        unit:      e.unit,
-        value:     String(e.value),
-        reference: e.reference,
-        status:    e.status,
-        trend:     e.trend,
-        last_date: examDate,
-      })),
-      { onConflict: "user_id,slug" }
-    );
-    if (upsertErr) return { error: upsertErr.message };
+    // Só atualiza o snapshot atual se este exame for o mais recente para cada slug.
+    // Evita que um upload de exame antigo sobrescreva valores de um exame mais novo.
+    const latestDateBySlug = (existing ?? []).reduce<Record<string, string>>((acc, r) => {
+      const d = r.recorded_at as string;
+      if (!acc[r.biomarker_slug] || d > acc[r.biomarker_slug]) acc[r.biomarker_slug] = d;
+      return acc;
+    }, {});
+    const toUpsert = resolved.filter((e) => {
+      const latest = latestDateBySlug[e.slug];
+      return !latest || examDate >= latest;
+    });
+
+    if (toUpsert.length > 0) {
+      const { error: upsertErr } = await supabase.from("biomarkers").upsert(
+        toUpsert.map((e) => ({
+          user_id:   user.id,
+          slug:      e.slug,
+          name:      e.name,
+          category:  e.category,
+          unit:      e.unit,
+          value:     String(e.value),
+          reference: e.reference,
+          status:    e.status,
+          trend:     e.trend,
+          last_date: examDate,
+        })),
+        { onConflict: "user_id,slug" }
+      );
+      if (upsertErr) return { error: upsertErr.message };
+    }
 
     const dateLabel = toDateLabel(examDate);
     const allPoints = [
