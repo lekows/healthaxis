@@ -60,6 +60,13 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const [error, setError]             = useState<string | null>(null);
   const [nameWarning, setNameWarning] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<(ImportSummary & { examDate: string | null }) | null>(null);
+  const [savedMsg, setSavedMsg]       = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!savedMsg) return;
+    const t = setTimeout(onClose, 2500);
+    return () => clearTimeout(t);
+  }, [savedMsg, onClose]);
 
   useEffect(() => {
     if (!importSummary) return;
@@ -390,7 +397,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         }
       } else {
         router.refresh();
-        onClose();
+        setSavedMsg("Documento salvo com sucesso.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
@@ -559,6 +566,17 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             </div>
           </div>
 
+          {savedMsg && (
+            <div className="p-4 rounded-2xl space-y-2"
+              style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.2)" }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle size={15} style={{ color: "#52B788" }} />
+                <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{savedMsg}</p>
+              </div>
+              <p className="text-xs" style={{ color: "#5A5A50" }}>Fechando automaticamente…</p>
+            </div>
+          )}
+
           {/* Resumo pós-importação */}
           {importSummary && (
             <div className="p-4 rounded-2xl space-y-3"
@@ -673,10 +691,17 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             className="text-sm disabled:opacity-40" style={{ color: "#5A5A50" }}>
             Cancelar
           </button>
-          {!nameWarning && !importSummary && (
+          {!nameWarning && !importSummary && !savedMsg && (
             <Button variant="primary" onClick={handleSave} disabled={loading}>
               {loading ? loadingMsg || "Salvando…" : "Salvar"}
             </Button>
+          )}
+          {savedMsg && (
+            <button onClick={onClose}
+              className="px-4 py-2 rounded-2xl text-sm font-medium"
+              style={{ background: "rgba(82,183,136,0.12)", color: "#52B788" }}>
+              Fechar
+            </button>
           )}
           {importSummary && (
             <button onClick={onClose}
