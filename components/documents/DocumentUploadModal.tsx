@@ -55,6 +55,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
 
   const [loading, setLoading]         = useState(false);
   const [loadingMsg, setLoadingMsg]   = useState("");
+  const [ocrProgress, setOcrProgress] = useState(0);
   const [error, setError]             = useState<string | null>(null);
   const [nameWarning, setNameWarning] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<(ImportSummary & { examDate: string | null }) | null>(null);
@@ -64,6 +65,18 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
     const t = setTimeout(onClose, 4000);
     return () => clearTimeout(t);
   }, [importSummary, onClose]);
+
+  useEffect(() => {
+    if (loadingMsg !== "Analisando exame…") { setOcrProgress(0); return; }
+    const start = Date.now();
+    const DURATION = 55000;
+    const id = setInterval(() => {
+      const t = Math.min((Date.now() - start) / DURATION, 0.99);
+      // Ease-out: fast start, slows near the end
+      setOcrProgress(Math.round((1 - Math.pow(1 - t, 1.6)) * 99));
+    }, 300);
+    return () => clearInterval(id);
+  }, [loadingMsg]);
 
   const handleFileChange = (f: File | null) => {
     if (!f) return;
@@ -596,10 +609,34 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
           )}
 
           {loading && loadingMsg && (
-            <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
-              style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)", color: "#52B788" }}>
-              <Loader2 size={13} className="animate-spin" /> {loadingMsg}
-            </div>
+            loadingMsg === "Analisando exame…" ? (
+              <div className="p-4 rounded-xl space-y-3"
+                style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: "#52B788" }}>
+                    {ocrProgress < 12 ? "Lendo o documento…"
+                      : ocrProgress < 32 ? "Identificando biomarcadores…"
+                      : ocrProgress < 56 ? "Verificando referências laboratoriais…"
+                      : ocrProgress < 76 ? "Organizando histórico clínico…"
+                      : ocrProgress < 90 ? "Quase pronto…"
+                      : "Finalizando…"}
+                  </span>
+                  <span className="text-xs font-mono tabular-nums" style={{ color: "#5A5A50" }}>{ocrProgress}%</span>
+                </div>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                  <div className="h-full rounded-full" style={{
+                    width: `${ocrProgress}%`,
+                    background: "linear-gradient(90deg, #52B788, #6fcfa0)",
+                    transition: "width 0.3s ease-out",
+                  }} />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
+                style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)", color: "#52B788" }}>
+                <Loader2 size={13} className="animate-spin" /> {loadingMsg}
+              </div>
+            )
           )}
         </div>
 
