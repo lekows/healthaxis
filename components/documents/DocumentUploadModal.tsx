@@ -322,6 +322,12 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
           }
 
           await saveOcrResults(data);
+          // Fire-and-forget: trigger metabolic pattern analysis in background
+          fetch("/api/agents/metabolic-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          }).catch(() => {});
         } catch (ocrErr) {
           setError(`Documento salvo. Erro na análise: ${ocrErr instanceof Error ? ocrErr.message : "tente novamente"}`);
           setLoading(false);
