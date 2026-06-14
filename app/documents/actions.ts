@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getReference, inferStatus } from "@/lib/biomarker-references";
+import { canonicalSlug } from "@/lib/biomarker-slug";
 import {
   computeDimensionScores, computeLifestyleScore, computeOverall,
   computeTrend, deriveReminders, resolvedReminderTitles,
@@ -137,10 +138,14 @@ export async function saveExamBiomarkers(
       .select("biomarker_slug, recorded_at, value")
       .eq("user_id", user.id);
 
+    // Normalize OCR-produced slugs to canonical forms before all comparisons.
+    // Existing history may also have non-canonical slugs from previous uploads.
+    const normalizedEntries = entries.map((e) => ({ ...e, slug: canonicalSlug(e.slug) }));
+
     const priorValue = (slug: string, embedded: { data: string; valor: number }[]): number | null => {
       const candidates = [
         ...(existing ?? [])
-          .filter((r) => r.biomarker_slug === slug && (r.recorded_at as string).slice(0, 10) < examDate)
+          .filter((r) => canonicalSlug(r.biomarker_slug) === slug && (r.recorded_at as string).slice(0, 10) < examDate)
           .map((r) => ({ date: (r.recorded_at as string).slice(0, 10), value: Number(r.value) })),
         ...embedded
           .filter((h) => h.data < examDate)
@@ -151,7 +156,7 @@ export async function saveExamBiomarkers(
       return candidates[0].value;
     };
 
-    const resolved = entries.map((e) => {
+    const resolved = normalizedEntries.map((e) => {
       const hasLabRef = e.ref_min !== null || e.ref_max !== null;
       const staticRef = getReference(e.slug, sex, ageYears);
       return {
@@ -164,9 +169,11 @@ export async function saveExamBiomarkers(
 
     // Só atualiza o snapshot atual se este exame for o mais recente para cada slug.
     // Evita que um upload de exame antigo sobrescreva valores de um exame mais novo.
+    // Normalize existing slugs so old non-canonical records don't create phantom "latest dates".
     const latestDateBySlug = (existing ?? []).reduce<Record<string, string>>((acc, r) => {
+      const slug = canonicalSlug(r.biomarker_slug);
       const d = (r.recorded_at as string).slice(0, 10);
-      if (!acc[r.biomarker_slug] || d > acc[r.biomarker_slug]) acc[r.biomarker_slug] = d;
+      if (!acc[slug] || d > acc[slug]) acc[slug] = d;
       return acc;
     }, {});
     const toUpsert = resolved.filter((e) => {
@@ -195,8 +202,8 @@ export async function saveExamBiomarkers(
 
     const dateLabel = toDateLabel(examDate);
     const allPoints = [
-      ...entries.map((e) => ({ slug: e.slug, recorded_at: examDate, date_label: dateLabel, value: e.value })),
-      ...entries.flatMap((e) =>
+      ...normalizedEntries.map((e) => ({ slug: e.slug, recorded_at: examDate, date_label: dateLabel, value: e.value })),
+      ...normalizedEntries.flatMap((e) =>
         (e.historico ?? []).map((h) => ({
           slug: e.slug, recorded_at: h.data, date_label: toDateLabel(h.data), value: h.valor,
         }))
@@ -205,7 +212,8 @@ export async function saveExamBiomarkers(
 
     // Dedup sem depender de unique constraint no banco: pontos já gravados foram
     // buscados acima; insere só os que faltam. Idempotente — reenviar o mesmo laudo não duplica.
-    const seen = new Set((existing ?? []).map((r) => `${r.biomarker_slug}|${r.recorded_at}`));
+    // Normalize existing slugs so tgo-ast and ast-tgo don't create duplicates.
+    const seen = new Set((existing ?? []).map((r) => `${canonicalSlug(r.biomarker_slug)}|${(r.recorded_at as string).slice(0, 10)}`));
 
     const toInsert = allPoints
       .filter((p) => {
@@ -260,7 +268,7 @@ export async function saveExamBiomarkers(
       };
 
       await supabase.from("health_scores").upsert(
-        { user_id: user.id, ...scores, updated_at: new Date().toISOString() },
+        { user_id: user.id, ...scores },
         { onConflict: "user_id" }
       );
 
@@ -481,7 +489,6 @@ async function recalculateBiomarkersAfterDelete(
       cardiovascular: dims.cardiovascular ?? 0,
       preventive:     dims.preventive ?? 0,
       lifestyle:      storedLifestyle ?? 0,
-      updated_at:     new Date().toISOString(),
     },
     { onConflict: "user_id" }
   );
