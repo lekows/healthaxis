@@ -308,10 +308,13 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
           }
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
           const raw = await res.text();
-          let data: (OCRExamData & { ocr_error?: string }) | null = null;
+          let data: (OCRExamData & { ocr_error?: string; error?: string }) | null = null;
           try { data = JSON.parse(raw); } catch { /* resposta não-JSON (erro de infraestrutura) */ }
           if (!res.ok || !data) {
-            setError(`Documento salvo. Falha na extração automática: ${res.status === 413 ? "arquivo muito grande" : "o servidor retornou um erro inesperado"}. Tente reenviar.`);
+            const serverMsg = data?.error ?? (res.status === 413 ? "arquivo muito grande (máx 8 MB)" : `erro ${res.status}`);
+            const isAuth = res.status === 401 || (res.status >= 300 && res.status < 400);
+            const hint = isAuth ? " Sessão expirada — recarregue a página." : " Tente reenviar.";
+            setError(`Documento salvo. Falha na extração automática: ${serverMsg}.${hint}`);
             setLoading(false);
             router.refresh();
             return;
