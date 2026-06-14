@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { X, Upload, CheckCircle, AlertTriangle, Loader2, FileText, Camera } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { X, Upload, CheckCircle, AlertTriangle, Loader2, FileText, Camera, FlaskConical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,7 @@ import {
   registerDocumentExamIdentity,
   saveExamBiomarkers,
   saveDoctor,
+  type ImportSummary,
 } from "@/app/documents/actions";
 import { inferStatus } from "@/lib/biomarker-references";
 import {
@@ -52,10 +53,17 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const [date, setDate]             = useState(() => new Date().toISOString().split("T")[0]);
   const [tags, setTags]             = useState("");
 
-  const [loading, setLoading]       = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState("");
-  const [error, setError]           = useState<string | null>(null);
+  const [loading, setLoading]         = useState(false);
+  const [loadingMsg, setLoadingMsg]   = useState("");
+  const [error, setError]             = useState<string | null>(null);
   const [nameWarning, setNameWarning] = useState<string | null>(null);
+  const [importSummary, setImportSummary] = useState<(ImportSummary & { examDate: string | null }) | null>(null);
+
+  useEffect(() => {
+    if (!importSummary) return;
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [importSummary, onClose]);
 
   const handleFileChange = (f: File | null) => {
     if (!f) return;
@@ -153,7 +161,6 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             ref_min:   r.ref_min,
             ref_max:   r.ref_max,
             reference: labRef,
-            // Status calculado numericamente — não depende do `alterado` do LLM
             status:    inferStatus(r.valor, labRef),
             historico: r.historico ?? [],
           };
@@ -165,6 +172,11 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         setError(`Documento salvo. Erro ao registrar biomarcadores: ${bioResult.error}`);
         setLoading(false);
         router.refresh();
+        return;
+      }
+      if (bioResult?.importSummary) {
+        router.refresh();
+        setImportSummary({ ...bioResult.importSummary, examDate: data.data_exame ?? null });
         return;
       }
     }
@@ -507,6 +519,47 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             </div>
           </div>
 
+          {/* Resumo pós-importação */}
+          {importSummary && (
+            <div className="p-4 rounded-2xl space-y-3"
+              style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.2)" }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle size={15} style={{ color: "#52B788" }} />
+                <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>
+                  Exame importado
+                  {importSummary.examDate && (
+                    <span className="font-normal ml-1" style={{ color: "#9A9688" }}>
+                      · {new Date(importSummary.examDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                {importSummary.updatedCurrent > 0 && (
+                  <p className="text-xs" style={{ color: "#52B788" }}>
+                    · {importSummary.updatedCurrent} biomarcador(es) com valores atualizados
+                  </p>
+                )}
+                {importSummary.newBiomarkers > 0 && (
+                  <p className="text-xs" style={{ color: "#52B788" }}>
+                    · {importSummary.newBiomarkers} novo(s) biomarcador(es) adicionado(s)
+                  </p>
+                )}
+                {importSummary.addedHistoryOnly > 0 && (
+                  <p className="text-xs" style={{ color: "#F4A261" }}>
+                    · {importSummary.addedHistoryOnly} biomarcador(es) adicionados ao histórico — exame anterior, valores atuais preservados
+                  </p>
+                )}
+                {importSummary.duplicateSkipped > 0 && (
+                  <p className="text-xs" style={{ color: "#5A5A50" }}>
+                    · {importSummary.duplicateSkipped} ponto(s) já existiam e foram ignorados
+                  </p>
+                )}
+              </div>
+              <p className="text-xs" style={{ color: "#5A5A50" }}>Fechando automaticamente…</p>
+            </div>
+          )}
+
           {/* Aviso de nome divergente */}
           {nameWarning && (
             <div className="p-4 rounded-2xl space-y-3"
@@ -554,10 +607,17 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             className="text-sm disabled:opacity-40" style={{ color: "#5A5A50" }}>
             Cancelar
           </button>
-          {!nameWarning && (
+          {!nameWarning && !importSummary && (
             <Button variant="primary" onClick={handleSave} disabled={loading}>
               {loading ? loadingMsg || "Salvando…" : "Salvar"}
             </Button>
+          )}
+          {importSummary && (
+            <button onClick={onClose}
+              className="px-4 py-2 rounded-2xl text-sm font-medium"
+              style={{ background: "rgba(82,183,136,0.1)", color: "#52B788", border: "1px solid rgba(82,183,136,0.2)" }}>
+              Fechar
+            </button>
           )}
         </div>
       </div>

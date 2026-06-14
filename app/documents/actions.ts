@@ -9,7 +9,14 @@ import {
   type BiomarkerStatus,
 } from "@/lib/health-derivation";
 
-type ActionResult = { error?: string; duplicate?: boolean; id?: string };
+export type ImportSummary = {
+  updatedCurrent: number;
+  addedHistoryOnly: number;
+  newBiomarkers: number;
+  duplicateSkipped: number;
+};
+
+type ActionResult = { error?: string; duplicate?: boolean; id?: string; importSummary?: ImportSummary };
 
 export async function createDocument(data: {
   title: string;
@@ -328,7 +335,14 @@ export async function saveExamBiomarkers(
     revalidatePath("/exams");
     revalidatePath("/dashboard");
     revalidatePath("/overview");
-    return {};
+    return {
+      importSummary: {
+        updatedCurrent:   toUpsert.filter((e) => !!latestDateBySlug[e.slug]).length,
+        newBiomarkers:    toUpsert.filter((e) => !latestDateBySlug[e.slug]).length,
+        addedHistoryOnly: resolved.length - toUpsert.length,
+        duplicateSkipped: allPoints.length - toInsert.length,
+      },
+    };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Erro inesperado ao salvar biomarcadores." };
   }
