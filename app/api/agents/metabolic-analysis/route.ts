@@ -14,8 +14,9 @@ Regras estritas:
 - Nunca use "diagnostique", "prescreva", "tome", "use", "encaminhe para".
 - Use framing como "padrão compatível com", "achados que costumam ser investigados por endocrinologia/cardiologia".
 - Identifique padrões bioquímicos conhecidos (ex.: resistência à insulina, dislipidemia aterogênica, NASH).
-- evidence: lista os biomarcadores que sustentam o padrão.
-- notes: contexto informacional — faixas de corte utilizadas, limitações dos dados.
+- Quando houver histórico de medições, comente a EVOLUÇÃO temporal — se melhorou, piorou ou se manteve estável.
+- evidence: lista os biomarcadores com valor atual E, se relevante, evolução histórica resumida.
+- notes: contexto informacional — tendências importantes, limitações dos dados, biomarcadores ausentes que enriqueceriam a análise.
 - confidence 0..1 refletindo completude dos dados metabólicos disponíveis.
 
 Retorne SOMENTE JSON válido no formato:
@@ -23,8 +24,8 @@ Retorne SOMENTE JSON válido no formato:
   "patterns": [
     {
       "name": "...",
-      "description": "... (linguagem informacional)",
-      "evidence": ["biomarcador: valor unidade (status)"],
+      "description": "... (linguagem informacional, inclua evolução temporal quando relevante)",
+      "evidence": ["biomarcador: valor_atual unidade (status) — histórico: val1 (data1) → val2 (data2)"],
       "relevance": "high|medium|low"
     }
   ],
@@ -66,12 +67,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { data: biomarkers } = await supabase
-      .from("biomarkers")
-      .select("name, slug, category, value, unit, status, trend, last_date")
-      .eq("user_id", patientId)
-      .in("category", METABOLIC_CATEGORIES)
-      .order("category");
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 24);
+
+    const [{ data: biomarkers }, { data: history }] = await Promise.all([
+      supabase
+        .from("biomarkers")
+        .select("name, slug, category, value, unit, status, trend, last_date")
+        .eq("user_id", patientId)
+        .in("category", METABOLIC_CATEGORIES)
+        .order("category"),
+      supabase
+        .from("biomarker_history")
+        .select("biomarker_slug, value, date_label, recorded_at")
+        .eq("user_id", patientId)
+        .gte("recorded_at", cutoff.toISOString().slice(0, 10))
+        .order("recorded_at"),
+    ]);
 
     if (!biomarkers || biomarkers.length === 0) {
       await supabase.from("agent_runs").update({
@@ -89,19 +101,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ runId: agentRun.id, patterns: [], confidence: 0 });
     }
 
-    const biomarkerSummary = biomarkers.map((b) =>
-      `${b.name} (${b.category}): ${b.value} ${b.unit} — status: ${b.status}, tendência: ${b.trend}, data: ${b.last_date ?? "?"}`
-    ).join("\n");
+    // Agrupa histórico por slug dos biomarcadores metabólicos
+    const metabolicSlugs = new Set(biomarkers.map((b) => b.slug));
+    const historyBySlug: Record<string, { label: string; value: number }[]> = {};
+    for (const row of history ?? []) {
+      if (!metabolicSlugs.has(row.biomarker_slug)) continue;
+      (historyBySlug[row.biomarker_slug] ??= []).push({
+        label: row.date_label ?? row.recorded_at,
+        value: Number(row.value),
+      });
+    }
+
+    const biomarkerSummary = biomarkers.map((b) => {
+      const hist = historyBySlug[b.slug];
+      const currentLine = `${b.name} (${b.category}): ${b.value} ${b.unit} — status: ${b.status}, tendência: ${b.trend}, medição: ${b.last_date ?? "?"}`;
+      if (!hist || hist.length <= 1) return currentLine;
+      const histLine = hist.map((h) => `${h.value} (${h.label})`).join(" → ");
+      return `${currentLine}\n  histórico (24 meses): ${histLine}`;
+    }).join("\n");
 
     const client = new Anthropic();
     const response = await client.messages.create({
       model: HAIKU,
-      max_tokens: 2048,
+      max_tokens: 3000,
       system: SYSTEM,
       messages: [
         {
           role: "user",
-          content: `Analise os seguintes biomarcadores metabólicos e identifique padrões bioquímicos relevantes:\n\n${biomarkerSummary}`,
+          content: `Analise os seguintes biomarcadores metabólicos e identifique padrões bioquímicos relevantes. Quando houver histórico, comente a evolução temporal:\n\n${biomarkerSummary}`,
         },
       ],
     });
