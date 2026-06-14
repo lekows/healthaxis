@@ -32,7 +32,8 @@ Retorne SOMENTE JSON válido:
   "patterns": [
     {
       "name": "...",
-      "description": "... (inclua perspectiva temporal quando relevante)",
+      "summary": "1 frase direta e acessível para leigos, sem jargão (ex.: 'Seu fígado está funcionando muito bem e melhorando.')",
+      "description": "Texto técnico detalhado com perspectiva temporal para quem quiser saber mais.",
       "evidence": ["biomarcador: valor_atual unidade (status) | trajetória: val1 → val2 → val3"],
       "relevance": "high|medium|low",
       "type": "protective|concern|mixed"
