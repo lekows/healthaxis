@@ -158,7 +158,8 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             historico: r.historico ?? [],
           };
         }),
-        data.data_exame ?? date
+        data.data_exame ?? date,
+        pendingDocumentId.current
       );
       if (bioResult?.error) {
         setError(`Documento salvo. Erro ao registrar biomarcadores: ${bioResult.error}`);

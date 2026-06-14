@@ -111,7 +111,8 @@ export async function saveExamBiomarkers(
     status: string;
     historico?: { data: string; valor: number }[];
   }[],
-  examDate: string
+  examDate: string,
+  documentId?: string | null
 ): Promise<ActionResult> {
   try {
     const supabase = await createClient();
@@ -200,6 +201,7 @@ export async function saveExamBiomarkers(
         date_label:     p.date_label,
         value:          p.value,
         recorded_at:    p.recorded_at,
+        ...(documentId ? { document_id: documentId } : {}),
       }));
 
     if (toInsert.length > 0) {
@@ -365,6 +367,100 @@ export async function saveDoctor(data: {
   }
 }
 
+async function recalculateBiomarkersAfterDelete(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  slugs: string[]
+): Promise<void> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("sex, dob, weight, height")
+    .eq("id", userId)
+    .single();
+  const sex = (profile?.sex as string | null) ?? null;
+  const ageYears = profile?.dob
+    ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25 * 24 * 3600 * 1000))
+    : null;
+
+  for (const slug of slugs) {
+    const { data: history } = await supabase
+      .from("biomarker_history")
+      .select("value, recorded_at, date_label")
+      .eq("user_id", userId)
+      .eq("biomarker_slug", slug)
+      .order("recorded_at", { ascending: false })
+      .limit(2);
+
+    if (!history || history.length === 0) {
+      await supabase.from("biomarkers").delete().eq("user_id", userId).eq("slug", slug);
+      continue;
+    }
+
+    const latest = history[0];
+    const latestValue = Number(latest.value);
+    const priorValue = history.length > 1 ? Number(history[1].value) : null;
+
+    const { data: existing } = await supabase
+      .from("biomarkers")
+      .select("name, category, unit, reference")
+      .eq("user_id", userId)
+      .eq("slug", slug)
+      .single();
+
+    if (!existing) continue;
+
+    const reference = existing.reference as Record<string, number>;
+    const staticRef = getReference(slug, sex, ageYears);
+    const effectiveRef = staticRef ?? reference;
+    const status = inferStatus(latestValue, effectiveRef);
+    const trend = computeTrend(latestValue, priorValue);
+
+    await supabase.from("biomarkers").update({
+      value:     String(latestValue),
+      last_date: latest.recorded_at as string,
+      status,
+      trend,
+    }).eq("user_id", userId).eq("slug", slug);
+  }
+
+  const { data: allBiomarkers } = await supabase
+    .from("biomarkers")
+    .select("category, status")
+    .eq("user_id", userId);
+
+  const dims = computeDimensionScores(
+    (allBiomarkers ?? []).map((b) => ({ category: b.category, status: b.status as BiomarkerStatus }))
+  );
+  const lifestyle = computeLifestyleScore(
+    profile?.weight ? Number(profile.weight) : null,
+    profile?.height ? Number(profile.height) : null
+  );
+
+  let storedLifestyle = lifestyle;
+  if (lifestyle === null) {
+    const { data: currentScore } = await supabase
+      .from("health_scores")
+      .select("lifestyle")
+      .eq("user_id", userId)
+      .maybeSingle();
+    storedLifestyle = currentScore?.lifestyle ?? 0;
+  }
+
+  const overall = computeOverall({ ...dims, lifestyle });
+  await supabase.from("health_scores").upsert(
+    {
+      user_id:        userId,
+      overall,
+      metabolic:      dims.metabolic ?? 0,
+      cardiovascular: dims.cardiovascular ?? 0,
+      preventive:     dims.preventive ?? 0,
+      lifestyle:      storedLifestyle ?? 0,
+      updated_at:     new Date().toISOString(),
+    },
+    { onConflict: "user_id" }
+  );
+}
+
 export async function deleteDocument(documentId: string): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -372,10 +468,49 @@ export async function deleteDocument(documentId: string): Promise<{ error?: stri
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("file_url")
+    .select("file_url, date")
     .eq("id", documentId)
     .eq("user_id", user.id)
     .single();
+
+  const { data: fkLinked } = await supabase
+    .from("biomarker_history")
+    .select("biomarker_slug")
+    .eq("user_id", user.id)
+    .eq("document_id", documentId);
+
+  const { data: legacyLinked } = doc?.date
+    ? await supabase
+        .from("biomarker_history")
+        .select("biomarker_slug")
+        .eq("user_id", user.id)
+        .eq("recorded_at", doc.date)
+        .is("document_id", null)
+    : { data: [] };
+
+  const affectedSlugs = [
+    ...new Set([
+      ...((fkLinked ?? []).map((r) => r.biomarker_slug as string)),
+      ...((legacyLinked ?? []).map((r) => r.biomarker_slug as string)),
+    ]),
+  ];
+
+  if (fkLinked && fkLinked.length > 0) {
+    await supabase
+      .from("biomarker_history")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("document_id", documentId);
+  }
+
+  if (doc?.date && legacyLinked && legacyLinked.length > 0) {
+    await supabase
+      .from("biomarker_history")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("recorded_at", doc.date)
+      .is("document_id", null);
+  }
 
   const { error } = await supabase
     .from("documents")
@@ -385,6 +520,14 @@ export async function deleteDocument(documentId: string): Promise<{ error?: stri
 
   if (error) return { error: error.message };
 
+  if (affectedSlugs.length > 0) {
+    try {
+      await recalculateBiomarkersAfterDelete(supabase, user.id, affectedSlugs);
+    } catch (recalcErr) {
+      console.error("Falha na recalculação pós-exclusão:", recalcErr);
+    }
+  }
+
   if (doc?.file_url) {
     const storagePath = doc.file_url.split("/exam-files/")[1]?.split("?")[0];
     if (storagePath) await supabase.storage.from("exam-files").remove([storagePath]);
@@ -393,6 +536,7 @@ export async function deleteDocument(documentId: string): Promise<{ error?: stri
   revalidatePath("/documents");
   revalidatePath("/dashboard");
   revalidatePath("/exams");
+  revalidatePath("/overview");
   return {};
 }
 
