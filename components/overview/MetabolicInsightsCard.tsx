@@ -112,13 +112,6 @@ export function MetabolicInsightsCard({ run }: Props) {
                   <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{p.name}</p>
                 </div>
                 <p className="text-xs leading-relaxed" style={{ color: "#9A9688" }}>{p.description}</p>
-                {p.evidence?.length > 0 && (
-                  <div className="space-y-0.5 pt-1">
-                    {p.evidence.map((ev, j) => (
-                      <p key={j} className="text-xs" style={{ color: "#5A5A50" }}>· {ev}</p>
-                    ))}
-                  </div>
-                )}
               </div>
             );
           })}
