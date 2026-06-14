@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { HealthOverview } from "@/components/dashboard/HealthOverview";
 import { ScoreEvolutionChart } from "@/components/dashboard/ScoreEvolutionChart";
-import { MetabolicInsightsCard } from "@/components/overview/MetabolicInsightsCard";
+import { MetabolicAnalysisSection } from "@/components/overview/MetabolicAnalysisSection";
 import { getHealthScore, getHealthScoreHistory, getProfile, getLatestMetabolicAnalysis } from "@/lib/supabase/queries";
 
 export default async function HealthOverviewPage() {
@@ -59,7 +59,7 @@ export default async function HealthOverviewPage() {
         {/* Existing overview content */}
         <HealthOverview />
 
-        {metabolicRun && <MetabolicInsightsCard run={metabolicRun} />}
+        <MetabolicAnalysisSection initialRun={metabolicRun} />
 
         <MedicalDisclaimer />
       </div>
