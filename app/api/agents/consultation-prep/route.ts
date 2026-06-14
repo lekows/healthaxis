@@ -88,8 +88,9 @@ export async function POST(req: NextRequest) {
 
   if (!link) return NextResponse.json({ error: "Vínculo não encontrado ou revogado" }, { status: 403 });
 
-  // Criar registro de execução
-  const { data: run, error: runErr } = await supabase
+  // Criar registro de execução — governança obrigatória:
+  // sem audit trail persistido, o agente não executa.
+  const { data: agentRun, error: runErr } = await supabase
     .from("agent_runs")
     .insert({
       agent_name: "consultation_prep",
@@ -101,8 +102,14 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single();
 
-  if (runErr || !run) {
-    return NextResponse.json({ error: "Erro ao iniciar agente" }, { status: 500 });
+  if (!agentRun?.id) {
+    return NextResponse.json(
+      {
+        error: "agent_audit_not_persisted",
+        message: "A execução foi bloqueada porque o registro em agent_runs não foi persistido.",
+      },
+      { status: 500 }
+    );
   }
 
   const toolsLog: ToolCallLog[] = [];
@@ -231,15 +238,15 @@ export async function POST(req: NextRequest) {
       estimated_cost: estimatedCost,
       confidence_score: brief.confidence,
       completed_at: new Date().toISOString(),
-    }).eq("id", run.id);
+    }).eq("id", agentRun.id);
 
-    return NextResponse.json({ runId: run.id, brief });
+    return NextResponse.json({ runId: agentRun.id, brief });
   } catch (err) {
     await supabase.from("agent_runs").update({
       status: "failed",
       tools_called: toolsLog,
       completed_at: new Date().toISOString(),
-    }).eq("id", run.id);
+    }).eq("id", agentRun.id);
 
     console.error("[consultation-prep]", err);
     return NextResponse.json({ error: "Falha na execução do agente" }, { status: 500 });
