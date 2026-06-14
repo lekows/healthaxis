@@ -34,12 +34,18 @@ Retorne SOMENTE JSON válido:
       "name": "...",
       "description": "... (inclua perspectiva temporal quando relevante)",
       "evidence": ["biomarcador: valor_atual unidade (status) | trajetória: val1 → val2 → val3"],
-      "relevance": "high|medium|low"
+      "relevance": "high|medium|low",
+      "type": "protective|concern|mixed"
     }
   ],
   "notes": "...",
   "confidence": 0.85
-}`;
+}
+
+Campo type:
+- "protective": achado positivo — todos os biomarcadores do padrão estão em faixas ótimas ou melhorando.
+- "concern": achado que merece atenção — pelo menos um biomarcador fora do intervalo ou com tendência preocupante.
+- "mixed": achados mistos — alguns ótimos, outros alterados no mesmo padrão.`;
 
 const METABOLIC_CATEGORIES = ["Glicemia", "Lipídios", "Função Hepática", "Função Renal", "Hormônios", "Inflamação"];
 

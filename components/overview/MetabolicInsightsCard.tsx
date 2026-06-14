@@ -1,10 +1,13 @@
 import { Activity } from "lucide-react";
 
+type PatternType = "protective" | "concern" | "mixed";
+
 type MetabolicPattern = {
   name: string;
   description: string;
   evidence: string[];
   relevance: "high" | "medium" | "low";
+  type?: PatternType;
 };
 
 type MetabolicOutput = {
@@ -33,29 +36,37 @@ function parseOutput(raw: unknown): MetabolicOutput | null {
   };
 }
 
-const RELEVANCE_COLOR: Record<string, string> = {
-  high: "#C1440E",
-  medium: "#F4A261",
-  low: "#52B788",
-};
-
-const RELEVANCE_BG: Record<string, string> = {
-  high: "rgba(193,68,14,0.08)",
-  medium: "rgba(244,162,97,0.08)",
-  low: "rgba(82,183,136,0.08)",
-};
-
-const RELEVANCE_BORDER: Record<string, string> = {
-  high: "rgba(193,68,14,0.2)",
-  medium: "rgba(244,162,97,0.2)",
-  low: "rgba(82,183,136,0.2)",
-};
-
 const RELEVANCE_LABEL: Record<string, string> = {
   high: "Alta",
   medium: "Média",
   low: "Baixa",
 };
+
+function patternColors(type: PatternType | undefined, relevance: string) {
+  if (type === "protective") {
+    return {
+      color:  "#52B788",
+      bg:     "rgba(82,183,136,0.08)",
+      border: "rgba(82,183,136,0.2)",
+      label:  relevance === "high" ? "Ótimo" : "Bom",
+    };
+  }
+  if (type === "concern") {
+    if (relevance === "high")   return { color: "#C1440E", bg: "rgba(193,68,14,0.08)",   border: "rgba(193,68,14,0.2)",   label: "Alta" };
+    if (relevance === "medium") return { color: "#F4A261", bg: "rgba(244,162,97,0.08)",  border: "rgba(244,162,97,0.2)",  label: "Média" };
+    return                             { color: "#F4A261", bg: "rgba(244,162,97,0.05)",  border: "rgba(244,162,97,0.15)", label: "Baixa" };
+  }
+  if (type === "mixed") {
+    return { color: "#F4A261", bg: "rgba(244,162,97,0.08)", border: "rgba(244,162,97,0.2)", label: "Misto" };
+  }
+  // Fallback para análises antigas sem campo type
+  const fallback: Record<string, { color: string; bg: string; border: string; label: string }> = {
+    high:   { color: "#C1440E", bg: "rgba(193,68,14,0.08)",  border: "rgba(193,68,14,0.2)",  label: "Alta" },
+    medium: { color: "#F4A261", bg: "rgba(244,162,97,0.08)", border: "rgba(244,162,97,0.2)", label: "Média" },
+    low:    { color: "#52B788", bg: "rgba(82,183,136,0.08)", border: "rgba(82,183,136,0.2)", label: "Baixa" },
+  };
+  return fallback[relevance] ?? fallback.low;
+}
 
 export function MetabolicInsightsCard({ run }: Props) {
   const output = parseOutput(run.output_json);
@@ -89,14 +100,14 @@ export function MetabolicInsightsCard({ run }: Props) {
       ) : (
         <div className="space-y-3">
           {output.patterns.map((p, i) => {
-            const rel = p.relevance ?? "low";
+            const colors = patternColors(p.type, p.relevance ?? "low");
             return (
               <div key={i} className="rounded-2xl p-4 space-y-2"
-                style={{ background: RELEVANCE_BG[rel] ?? RELEVANCE_BG.low, border: `1px solid ${RELEVANCE_BORDER[rel] ?? RELEVANCE_BORDER.low}` }}>
+                style={{ background: colors.bg, border: `1px solid ${colors.border}` }}>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider"
-                    style={{ color: RELEVANCE_COLOR[rel] ?? RELEVANCE_COLOR.low }}>
-                    {RELEVANCE_LABEL[rel] ?? rel}
+                    style={{ color: colors.color }}>
+                    {colors.label}
                   </span>
                   <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{p.name}</p>
                 </div>
