@@ -72,6 +72,7 @@ export async function registerDocumentExamIdentity(data: {
   externalOrderId: string | null;
   externalOrderType: string | null;
   semanticFingerprint: string | null;
+  examDate?: string | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -84,6 +85,7 @@ export async function registerDocumentExamIdentity(data: {
       external_order_id: data.externalOrderId,
       external_order_type: data.externalOrderType,
       semantic_fingerprint: data.semanticFingerprint,
+      ...(data.examDate ? { date: data.examDate } : {}),
     })
     .eq("id", data.documentId)
     .eq("user_id", user.id);

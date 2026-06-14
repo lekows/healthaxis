@@ -100,6 +100,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
       externalOrderId: normalizeExamIdentifier(data.identificador_externo?.valor),
       externalOrderType: normalizeExamIdentifier(data.identificador_externo?.tipo),
       semanticFingerprint: semanticInput ? await sha256Hex(semanticInput) : null,
+      examDate: data.data_exame ?? null,
     });
 
     if (identityResult.duplicate) {
@@ -157,7 +158,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             historico: r.historico ?? [],
           };
         }),
-        date
+        data.data_exame ?? date
       );
       if (bioResult?.error) {
         setError(`Documento salvo. Erro ao registrar biomarcadores: ${bioResult.error}`);
