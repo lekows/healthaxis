@@ -77,7 +77,14 @@ create table public.documents (
   status text check (status in ('reviewed','pending','processing')) default 'pending',
   tags text[] default '{}',
   file_url text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  -- Pipeline de extração de documentos (OCR via Claude Haiku).
+  -- Ver supabase/migrations/20260614195358_add_document_extraction_columns.sql
+  extraction_status text default 'pending',   -- pending | processing | processed | error
+  extraction_progress integer default 0,      -- 0–100, alimenta a barra de progresso
+  extraction_message text,                     -- mensagem da etapa atual exibida ao usuário
+  extraction_error text,                       -- detalhe do erro quando a extração falha
+  extracted_at timestamptz                     -- conclusão (extraction_status = processed)
 );
 
 -- =============================================
