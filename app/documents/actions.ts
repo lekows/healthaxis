@@ -140,8 +140,8 @@ export async function saveExamBiomarkers(
     const priorValue = (slug: string, embedded: { data: string; valor: number }[]): number | null => {
       const candidates = [
         ...(existing ?? [])
-          .filter((r) => r.biomarker_slug === slug && r.recorded_at < examDate)
-          .map((r) => ({ date: r.recorded_at as string, value: Number(r.value) })),
+          .filter((r) => r.biomarker_slug === slug && (r.recorded_at as string).slice(0, 10) < examDate)
+          .map((r) => ({ date: (r.recorded_at as string).slice(0, 10), value: Number(r.value) })),
         ...embedded
           .filter((h) => h.data < examDate)
           .map((h) => ({ date: h.data, value: h.valor })),
@@ -165,7 +165,7 @@ export async function saveExamBiomarkers(
     // Só atualiza o snapshot atual se este exame for o mais recente para cada slug.
     // Evita que um upload de exame antigo sobrescreva valores de um exame mais novo.
     const latestDateBySlug = (existing ?? []).reduce<Record<string, string>>((acc, r) => {
-      const d = r.recorded_at as string;
+      const d = (r.recorded_at as string).slice(0, 10);
       if (!acc[r.biomarker_slug] || d > acc[r.biomarker_slug]) acc[r.biomarker_slug] = d;
       return acc;
     }, {});
