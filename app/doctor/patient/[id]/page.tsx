@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers } from "@/lib/supabase/doctor-queries";
 import { WatchedBiomarkerToggle } from "@/components/doctor/WatchedBiomarkerToggle";
+import { ConsultationPrepClient } from "@/components/doctor/ConsultationPrepClient";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
 import { HealthMetricCard } from "@/components/dashboard/MetricCards";
@@ -102,6 +103,9 @@ export default async function DoctorPatientPage({ params }: Props) {
             </p>
           </div>
         </div>
+
+        {/* Preparação de consulta */}
+        <ConsultationPrepClient patientId={id} />
 
         {/* Resumo de alertas */}
         <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>

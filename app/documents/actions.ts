@@ -266,6 +266,49 @@ export async function saveExamBiomarkers(
       console.error("Falha na derivação pós-upload:", derivErr);
     }
 
+    // Gatilho de reconexão: se o exame veio com CRM de médico não vinculado,
+    // sugerir ao paciente que convide esse médico. Best-effort, não bloqueia.
+    try {
+      const { data: doc } = await supabase
+        .from("documents")
+        .select("doctor_crm, doctor_crm_uf, doctor_name")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (doc?.doctor_crm) {
+        const { data: linked } = await supabase
+          .from("doctor_patient_links")
+          .select("id")
+          .eq("patient_id", user.id)
+          .is("revoked_at", null);
+
+        const linkedDoctorIds = (linked ?? []).map((l) => l.id);
+        const { data: isLinked } = linkedDoctorIds.length > 0
+          ? await supabase
+              .from("doctor_profiles")
+              .select("id")
+              .eq("crm", doc.doctor_crm)
+              .eq("crm_uf", doc.doctor_crm_uf ?? "")
+              .in("id", linkedDoctorIds)
+              .maybeSingle()
+          : { data: null };
+
+        if (!isLinked) {
+          await supabase.from("preventive_reminders").upsert({
+            user_id: user.id,
+            title: `Convidar Dr. ${doc.doctor_name ?? "solicitante"} para o HealthAxis`,
+            description: `O médico que solicitou este exame ainda não está vinculado. Convide-o para acompanhar seus resultados diretamente.`,
+            priority: "low",
+            done: false,
+          }, { onConflict: "user_id,title" });
+        }
+      }
+    } catch (reconnectErr) {
+      console.error("Falha no gatilho de reconexão:", reconnectErr);
+    }
+
     revalidatePath("/exams");
     revalidatePath("/dashboard");
     revalidatePath("/overview");
