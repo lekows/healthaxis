@@ -157,3 +157,21 @@ export async function getHealthScoreHistory() {
 
   return data ?? [];
 }
+
+export async function getLatestMetabolicAnalysis() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("agent_runs")
+    .select("id, output_json, confidence_score, completed_at")
+    .eq("patient_id", user.id)
+    .eq("agent_name", "metabolic_analysis")
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data;
+}

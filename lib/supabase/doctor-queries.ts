@@ -201,6 +201,24 @@ export async function getWatchedBiomarkersByPatient(patientId: string): Promise<
   return data ?? [];
 }
 
+export async function getPatientLatestMetabolicAnalysis(patientId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("agent_runs")
+    .select("id, output_json, confidence_score, completed_at")
+    .eq("patient_id", patientId)
+    .eq("agent_name", "metabolic_analysis")
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data;
+}
+
 export async function getMySharedTokens(): Promise<SharedExamToken[]> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

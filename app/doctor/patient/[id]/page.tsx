@@ -1,8 +1,9 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
-import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers } from "@/lib/supabase/doctor-queries";
+import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers, getPatientLatestMetabolicAnalysis } from "@/lib/supabase/doctor-queries";
 import { WatchedBiomarkerToggle } from "@/components/doctor/WatchedBiomarkerToggle";
 import { ConsultationPrepClient } from "@/components/doctor/ConsultationPrepClient";
+import { MetabolicInsightsCard } from "@/components/overview/MetabolicInsightsCard";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
 import { HealthMetricCard } from "@/components/dashboard/MetricCards";
@@ -31,11 +32,12 @@ function age(dob: string | null): string {
 export default async function DoctorPatientPage({ params }: Props) {
   const { id } = await params;
 
-  const [profile, doctorProfile, panel, watched] = await Promise.all([
+  const [profile, doctorProfile, panel, watched, metabolicRun] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
     getLinkedPatientPanel(id),
     getWatchedBiomarkers(id),
+    getPatientLatestMetabolicAnalysis(id),
   ]);
   const watchedSlugs = new Set(watched.map((w) => w.slug));
 
@@ -106,6 +108,9 @@ export default async function DoctorPatientPage({ params }: Props) {
 
         {/* Preparação de consulta */}
         <ConsultationPrepClient patientId={id} />
+
+        {/* Padrões metabólicos da última análise automática */}
+        {metabolicRun && <MetabolicInsightsCard run={metabolicRun} />}
 
         {/* Resumo de alertas */}
         <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
