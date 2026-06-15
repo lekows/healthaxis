@@ -4,13 +4,14 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
-  FolderOpen, Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode
+  FolderOpen, Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode, BarChart2
 } from "lucide-react";
 import { ease } from "@/lib/motion";
 import { signOut } from "@/app/auth/actions";
 
 const navItems = [
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
+  { href: "/overview", label: "Visão Geral", icon: BarChart2 },
   { href: "/body-map", label: "Mapa Corporal", icon: Activity },
   { href: "/exams", label: "Exames", icon: FlaskConical },
   { href: "/doctors", label: "Médicos", icon: Stethoscope },

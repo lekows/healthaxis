@@ -2,13 +2,15 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { HealthOverview } from "@/components/dashboard/HealthOverview";
 import { ScoreEvolutionChart } from "@/components/dashboard/ScoreEvolutionChart";
-import { getHealthScore, getHealthScoreHistory, getProfile } from "@/lib/supabase/queries";
+import { MetabolicAnalysisSection } from "@/components/overview/MetabolicAnalysisSection";
+import { getHealthScore, getHealthScoreHistory, getProfile, getLatestMetabolicAnalysis } from "@/lib/supabase/queries";
 
 export default async function HealthOverviewPage() {
-  const [profile, score, history] = await Promise.all([
+  const [profile, score, history, metabolicRun] = await Promise.all([
     getProfile(),
     getHealthScore(),
     getHealthScoreHistory(),
+    getLatestMetabolicAnalysis(),
   ]);
 
   const current = score ?? { overall: 0, metabolic: 0, cardiovascular: 0, lifestyle: 0, preventive: 0 };
@@ -56,6 +58,8 @@ export default async function HealthOverviewPage() {
 
         {/* Existing overview content */}
         <HealthOverview />
+
+        <MetabolicAnalysisSection initialRun={metabolicRun} />
 
         <MedicalDisclaimer />
       </div>

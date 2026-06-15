@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, Loader2 } from "lucide-react";
 import { deleteDocument } from "@/app/documents/actions";
@@ -14,6 +14,14 @@ export function DeleteDocumentButton({ documentId, documentTitle }: Props) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "confirming" | "loading">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (state !== "loading") { setElapsed(0); return; }
+    const start = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [state]);
 
   async function handleConfirm() {
     setState("loading");
@@ -24,6 +32,25 @@ export function DeleteDocumentButton({ documentId, documentTitle }: Props) {
       return;
     }
     router.refresh();
+  }
+
+  if (state === "loading") {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}>
+        <div className="w-full max-w-sm flex flex-col items-center gap-3 rounded-3xl px-6 py-8 text-center"
+          style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <Loader2 size={28} className="animate-spin" style={{ color: "#52B788" }} />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>Excluindo exame…</p>
+            <p className="text-xs" style={{ color: "#9A9688" }}>
+              Atualizando biomarcadores e indicadores. Isso pode levar alguns segundos.
+            </p>
+          </div>
+          <span className="text-xs font-mono tabular-nums" style={{ color: "#5A5A50" }}>{elapsed}s</span>
+        </div>
+      </div>
+    );
   }
 
   if (state === "confirming") {
@@ -45,10 +72,6 @@ export function DeleteDocumentButton({ documentId, documentTitle }: Props) {
         {error && <span className="text-xs" style={{ color: "#C1440E" }}>{error}</span>}
       </div>
     );
-  }
-
-  if (state === "loading") {
-    return <Loader2 size={14} className="animate-spin" style={{ color: "#5A5A50" }} />;
   }
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { X, Upload, CheckCircle, AlertTriangle, Loader2, FileText, Camera } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { X, Upload, CheckCircle, AlertTriangle, Loader2, FileText, Camera, FlaskConical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,7 @@ import {
   registerDocumentExamIdentity,
   saveExamBiomarkers,
   saveDoctor,
+  type ImportSummary,
 } from "@/app/documents/actions";
 import { inferStatus } from "@/lib/biomarker-references";
 import {
@@ -52,10 +53,60 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const [date, setDate]             = useState(() => new Date().toISOString().split("T")[0]);
   const [tags, setTags]             = useState("");
 
-  const [loading, setLoading]       = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState("");
-  const [error, setError]           = useState<string | null>(null);
+  const [loading, setLoading]         = useState(false);
+  const [loadingMsg, setLoadingMsg]   = useState("");
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrMsg, setOcrMsg]           = useState("");
+  const [error, setError]             = useState<string | null>(null);
   const [nameWarning, setNameWarning] = useState<string | null>(null);
+  const [importSummary, setImportSummary] = useState<(ImportSummary & { examDate: string | null }) | null>(null);
+  const [savedMsg, setSavedMsg]       = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!savedMsg) return;
+    const t = setTimeout(onClose, 2500);
+    return () => clearTimeout(t);
+  }, [savedMsg, onClose]);
+
+  useEffect(() => {
+    if (!importSummary) return;
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [importSummary, onClose]);
+
+  useEffect(() => {
+    if (loadingMsg !== "Analisando exame…") {
+      setOcrProgress(0);
+      setOcrMsg("");
+      return;
+    }
+    // Timer de fallback: avança até 25% enquanto o primeiro bump do servidor não chega.
+    const start = Date.now();
+    const timerId = setInterval(() => {
+      const t = Math.min((Date.now() - start) / 30000, 1);
+      setOcrProgress(p => Math.max(p, Math.round((1 - Math.pow(1 - t, 2)) * 25)));
+    }, 500);
+
+    const docId = pendingDocumentId.current;
+    if (!docId) return () => clearInterval(timerId);
+
+    const supabase = createClient();
+    const poll = async () => {
+      const { data } = await supabase
+        .from("documents")
+        .select("extraction_progress, extraction_message")
+        .eq("id", docId)
+        .maybeSingle();
+      if (data?.extraction_progress != null && data.extraction_progress > 0) {
+        setOcrProgress(p => Math.max(p, data.extraction_progress ?? 0));
+      }
+      if (data?.extraction_message) setOcrMsg(data.extraction_message);
+    };
+
+    poll();
+    const pollId = setInterval(poll, 1500);
+    return () => { clearInterval(timerId); clearInterval(pollId); };
+  }, [loadingMsg]);
 
   const handleFileChange = (f: File | null) => {
     if (!f) return;
@@ -100,6 +151,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
       externalOrderId: normalizeExamIdentifier(data.identificador_externo?.valor),
       externalOrderType: normalizeExamIdentifier(data.identificador_externo?.tipo),
       semanticFingerprint: semanticInput ? await sha256Hex(semanticInput) : null,
+      examDate: data.data_exame ?? null,
     });
 
     if (identityResult.duplicate) {
@@ -152,17 +204,22 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             ref_min:   r.ref_min,
             ref_max:   r.ref_max,
             reference: labRef,
-            // Status calculado numericamente — não depende do `alterado` do LLM
             status:    inferStatus(r.valor, labRef),
             historico: r.historico ?? [],
           };
         }),
-        date
+        data.data_exame ?? date,
+        pendingDocumentId.current
       );
       if (bioResult?.error) {
         setError(`Documento salvo. Erro ao registrar biomarcadores: ${bioResult.error}`);
         setLoading(false);
         router.refresh();
+        return;
+      }
+      if (bioResult?.importSummary) {
+        router.refresh();
+        setImportSummary({ ...bioResult.importSummary, examDate: data.data_exame ?? null });
         return;
       }
     }
@@ -281,6 +338,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         setLoadingMsg("Analisando exame…");
         try {
           const fd = new FormData();
+          if (pendingDocumentId.current) fd.append("document_id", pendingDocumentId.current);
           if (inputMode === "text") {
             fd.append("text", pastedText.trim());
           } else if (fileUrl) {
@@ -294,10 +352,13 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
           }
           const res = await fetch("/api/extract-exam", { method: "POST", body: fd });
           const raw = await res.text();
-          let data: (OCRExamData & { ocr_error?: string }) | null = null;
+          let data: (OCRExamData & { ocr_error?: string; error?: string }) | null = null;
           try { data = JSON.parse(raw); } catch { /* resposta não-JSON (erro de infraestrutura) */ }
           if (!res.ok || !data) {
-            setError(`Documento salvo. Falha na extração automática: ${res.status === 413 ? "arquivo muito grande" : "o servidor retornou um erro inesperado"}. Tente reenviar.`);
+            const serverMsg = data?.error ?? (res.status === 413 ? "arquivo muito grande (máx 8 MB)" : `erro ${res.status}`);
+            const isAuth = res.status === 401 || (res.status >= 300 && res.status < 400);
+            const hint = isAuth ? " Sessão expirada — recarregue a página." : " Tente reenviar.";
+            setError(`Documento salvo. Falha na extração automática: ${serverMsg}.${hint}`);
             setLoading(false);
             router.refresh();
             return;
@@ -322,6 +383,12 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
           }
 
           await saveOcrResults(data);
+          // Fire-and-forget: trigger metabolic pattern analysis in background
+          fetch("/api/agents/metabolic-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          }).catch(() => {});
         } catch (ocrErr) {
           setError(`Documento salvo. Erro na análise: ${ocrErr instanceof Error ? ocrErr.message : "tente novamente"}`);
           setLoading(false);
@@ -330,7 +397,7 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         }
       } else {
         router.refresh();
-        onClose();
+        setSavedMsg("Documento salvo com sucesso.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar. Tente novamente.");
@@ -499,6 +566,58 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             </div>
           </div>
 
+          {savedMsg && (
+            <div className="p-4 rounded-2xl space-y-2"
+              style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.2)" }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle size={15} style={{ color: "#52B788" }} />
+                <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{savedMsg}</p>
+              </div>
+              <p className="text-xs" style={{ color: "#5A5A50" }}>Fechando automaticamente…</p>
+            </div>
+          )}
+
+          {/* Resumo pós-importação */}
+          {importSummary && (
+            <div className="p-4 rounded-2xl space-y-3"
+              style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.2)" }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle size={15} style={{ color: "#52B788" }} />
+                <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>
+                  Exame importado
+                  {importSummary.examDate && (
+                    <span className="font-normal ml-1" style={{ color: "#9A9688" }}>
+                      · {new Date(importSummary.examDate + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                {importSummary.updatedCurrent > 0 && (
+                  <p className="text-xs" style={{ color: "#52B788" }}>
+                    · {importSummary.updatedCurrent} biomarcador(es) com valores atualizados
+                  </p>
+                )}
+                {importSummary.newBiomarkers > 0 && (
+                  <p className="text-xs" style={{ color: "#52B788" }}>
+                    · {importSummary.newBiomarkers} novo(s) biomarcador(es) adicionado(s)
+                  </p>
+                )}
+                {importSummary.addedHistoryOnly > 0 && (
+                  <p className="text-xs" style={{ color: "#F4A261" }}>
+                    · {importSummary.addedHistoryOnly} biomarcador(es) adicionados ao histórico — exame anterior, valores atuais preservados
+                  </p>
+                )}
+                {importSummary.duplicateSkipped > 0 && (
+                  <p className="text-xs" style={{ color: "#5A5A50" }}>
+                    · {importSummary.duplicateSkipped} ponto(s) já existiam e foram ignorados
+                  </p>
+                )}
+              </div>
+              <p className="text-xs" style={{ color: "#5A5A50" }}>Fechando automaticamente…</p>
+            </div>
+          )}
+
           {/* Aviso de nome divergente */}
           {nameWarning && (
             <div className="p-4 rounded-2xl space-y-3"
@@ -532,10 +651,36 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
           )}
 
           {loading && loadingMsg && (
-            <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
-              style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)", color: "#52B788" }}>
-              <Loader2 size={13} className="animate-spin" /> {loadingMsg}
-            </div>
+            loadingMsg === "Analisando exame…" ? (
+              <div className="p-4 rounded-xl space-y-3"
+                style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: "#52B788" }}>
+                    {ocrMsg || (
+                      ocrProgress < 15 ? "Iniciando análise…"
+                      : ocrProgress < 35 ? "Identificando biomarcadores…"
+                      : ocrProgress < 60 ? "Verificando referências laboratoriais…"
+                      : ocrProgress < 80 ? "Organizando histórico clínico…"
+                      : ocrProgress < 92 ? "Quase pronto…"
+                      : "Finalizando…"
+                    )}
+                  </span>
+                  <span className="text-xs font-mono tabular-nums" style={{ color: "#5A5A50" }}>{ocrProgress}%</span>
+                </div>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                  <div className="h-full rounded-full" style={{
+                    width: `${ocrProgress}%`,
+                    background: "linear-gradient(90deg, #52B788, #6fcfa0)",
+                    transition: "width 0.4s ease-out",
+                  }} />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 rounded-xl text-sm"
+                style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)", color: "#52B788" }}>
+                <Loader2 size={13} className="animate-spin" /> {loadingMsg}
+              </div>
+            )
           )}
         </div>
 
@@ -546,10 +691,24 @@ function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             className="text-sm disabled:opacity-40" style={{ color: "#5A5A50" }}>
             Cancelar
           </button>
-          {!nameWarning && (
+          {!nameWarning && !importSummary && !savedMsg && (
             <Button variant="primary" onClick={handleSave} disabled={loading}>
               {loading ? loadingMsg || "Salvando…" : "Salvar"}
             </Button>
+          )}
+          {savedMsg && (
+            <button onClick={onClose}
+              className="px-4 py-2 rounded-2xl text-sm font-medium"
+              style={{ background: "rgba(82,183,136,0.12)", color: "#52B788" }}>
+              Fechar
+            </button>
+          )}
+          {importSummary && (
+            <button onClick={onClose}
+              className="px-4 py-2 rounded-2xl text-sm font-medium"
+              style={{ background: "rgba(82,183,136,0.1)", color: "#52B788", border: "1px solid rgba(82,183,136,0.2)" }}>
+              Fechar
+            </button>
           )}
         </div>
       </div>

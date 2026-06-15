@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 
-// Laudos grandes (49 páginas, ~56 biomarcadores com histórico) geram respostas longas
-// que levam dezenas de segundos — precisa de janela maior que o default da função.
-export const maxDuration = 60;
+// Laudos grandes geram respostas longas — janela generosa para não cortar no meio do JSON.
+// salvageObjects() recupera objetos completos mesmo se a resposta for truncada.
+export const maxDuration = 120;
 
-// Output amplo: um laudo Sabin completo com histórico chega a ~10k tokens de JSON.
-// 8192 truncava a resposta no meio do JSON e o parse falhava ("resposta vazia").
-const MAX_OUTPUT_TOKENS = 16000;
+// 8192 truncava respostas de laudos Sabin de 49 páginas com histórico extenso.
+// 12000 é o ponto de equilíbrio: cobre ~50 biomarcadores com histórico sem timeout.
+const MAX_OUTPUT_TOKENS = 12000;
 
 const IDENTIFIER_PROMPT = `Extraia tambem identificador_externo: { tipo: string, valor: string } quando houver
 OS, ordem de servico, pedido, protocolo, atendimento, accession number ou numero do laudo.
@@ -201,6 +201,37 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
+  // documentId is set inside the try once the form is parsed.
+  // bump/finalizeExtraction are defined here so the catch block can call finalizeExtraction.
+  let documentId: string | null = null;
+
+  const bump = (progress: number, message: string) => {
+    if (!documentId) return;
+    supabase.from("documents").update({
+      extraction_status: "processing",
+      extraction_progress: progress,
+      extraction_message: message,
+    }).eq("id", documentId).eq("user_id", user.id).then(() => {});
+  };
+
+  const finalizeExtraction = async (success: boolean, errorMsg?: string) => {
+    if (!documentId) return;
+    if (success) {
+      await supabase.from("documents").update({
+        status: "reviewed",
+        extraction_status: "processed",
+        extraction_progress: 100,
+        extraction_message: "Exame processado com sucesso.",
+        extracted_at: new Date().toISOString(),
+      }).eq("id", documentId).eq("user_id", user.id);
+    } else {
+      supabase.from("documents").update({
+        extraction_status: "error",
+        extraction_error: errorMsg ?? "Erro desconhecido.",
+      }).eq("id", documentId).eq("user_id", user.id).then(() => {});
+    }
+  };
+
   try {
     const form = await req.formData();
     const pastedText = form.get("text") as string | null;
@@ -210,6 +241,7 @@ export async function POST(req: NextRequest) {
     const fileUrl = form.get("file_url") as string | null;
     const fileType = form.get("file_type") as string | null;
     const fileName = form.get("file_name") as string | null;
+    documentId = form.get("document_id") as string | null;
 
     if (!file && !pastedText && !fileUrl) return NextResponse.json({ error: "Arquivo ou texto ausente" }, { status: 400 });
     if (file && file.size > 8 * 1024 * 1024) {
@@ -220,11 +252,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ resultados: [], ocr_error: "Serviço de análise não configurado." });
     }
 
+    bump(5, "Iniciando análise…");
+
     // Texto colado pelo usuário — caminho direto, zero tokens de ruído de PDF
     if (pastedText && pastedText.trim().length > 10) {
       const client = new Anthropic();
       const truncated = pastedText.length > 12000 ? pastedText.substring(0, 12000) : pastedText;
       console.log(`[extract-exam] Texto colado (${pastedText.length} chars). Usando texto direto.`);
+      bump(30, "Enviando para análise…");
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: MAX_OUTPUT_TOKENS,
@@ -233,7 +268,9 @@ export async function POST(req: NextRequest) {
       });
       const block = msg.content[0];
       const responseText = block.type === "text" ? block.text : "";
+      bump(90, "Interpretando resultados…");
       const examData = parseResponse(responseText);
+      await finalizeExtraction(true);
       return NextResponse.json({
         ...examData,
         identificador_externo: examData.identificador_externo ?? extractKnownExternalIdentifier(pastedText),
@@ -247,8 +284,21 @@ export async function POST(req: NextRequest) {
     let imageMediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/jpeg";
 
     if (fileUrl) {
-      const resp = await fetch(fileUrl);
-      if (!resp.ok) return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
+      const ctrl = new AbortController();
+      const storageTimeout = setTimeout(() => ctrl.abort(), 20000);
+      let resp: Response;
+      try {
+        resp = await fetch(fileUrl, { signal: ctrl.signal });
+      } catch {
+        clearTimeout(storageTimeout);
+        await finalizeExtraction(false, "Tempo limite ao baixar o arquivo.");
+        return NextResponse.json({ resultados: [], ocr_error: "Tempo limite ao baixar o arquivo. Tente novamente." });
+      }
+      clearTimeout(storageTimeout);
+      if (!resp.ok) {
+        await finalizeExtraction(false, "Não foi possível baixar o arquivo.");
+        return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
+      }
       buffer = Buffer.from(await resp.arrayBuffer());
       isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
       if (!isPDF && fileType && imageTypes.includes(fileType)) imageMediaType = fileType as typeof imageMediaType;
@@ -257,6 +307,7 @@ export async function POST(req: NextRequest) {
       isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
       if (!isPDF && imageTypes.includes(file!.type)) imageMediaType = file!.type as typeof imageMediaType;
     }
+    bump(20, "Arquivo recebido…");
 
     const client = new Anthropic();
     let responseText = "";
@@ -268,11 +319,15 @@ export async function POST(req: NextRequest) {
 
       if (pdfText) {
         deterministicIdentifier = extractKnownExternalIdentifier(pdfText) ?? deterministicIdentifier;
-        // PDF digital com texto selecionável — envia o texto completo (até 120k chars). A tabela
-        // LAUDO COMPARATIVO de laudos Sabin/Fleury/DASA fica na última página (~75k chars num laudo
-        // de 49 páginas), então o limite precisa cobrir o documento inteiro para capturar o histórico.
-        const truncated = pdfText.length > 120000 ? pdfText.substring(0, 120000) : pdfText;
+        // Para laudos muito grandes (ex: Sabin 49 páginas ≈ 120k chars), a tabela comparativa
+        // fica nas últimas páginas. Estratégia head+tail: primeiros 60k + últimos 25k chars,
+        // cobrindo resultados e histórico sem estourar o timeout do gateway (504).
+        const LIMIT = 85000;
+        const truncated = pdfText.length > LIMIT
+          ? pdfText.substring(0, 60000) + "\n\n[...]\n\n" + pdfText.substring(pdfText.length - 25000)
+          : pdfText;
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
+        bump(35, "Enviando para análise…");
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
           max_tokens: MAX_OUTPUT_TOKENS,
@@ -287,6 +342,7 @@ export async function POST(req: NextRequest) {
       } else {
         // PDF escaneado — envia como documento via beta
         console.log("[extract-exam] PDF escaneado. Usando visão.");
+        bump(28, "Enviando PDF para visão computacional…");
         const base64 = buffer.toString("base64");
         const msg = await client.beta.messages.create({
           model: "claude-haiku-4-5-20251001",
@@ -306,6 +362,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Imagem (JPG, PNG, WebP)
+      bump(28, "Enviando imagem para análise…");
       const base64 = buffer.toString("base64");
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
@@ -323,9 +380,11 @@ export async function POST(req: NextRequest) {
       responseText = block.type === "text" ? block.text : "";
     }
 
+    bump(90, "Interpretando resultados…");
     console.log("[extract-exam] responseText (primeiros 800 chars):", responseText.substring(0, 800));
     const examData = parseResponse(responseText);
     console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
+    await finalizeExtraction(true);
     return NextResponse.json({
       ...examData,
       identificador_externo: deterministicIdentifier ?? examData.identificador_externo,
@@ -338,6 +397,7 @@ export async function POST(req: NextRequest) {
     const msg = isRateLimit
       ? "Limite de requisições atingido. Aguarde 1 minuto e tente novamente."
       : raw;
+    await finalizeExtraction(false, msg);
     return NextResponse.json({ resultados: [], ocr_error: msg });
   }
 }
