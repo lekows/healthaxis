@@ -258,7 +258,7 @@ export async function saveExamBiomarkers(
         storedLifestyle = currentScore?.lifestyle ?? 0;
       }
 
-      const overall = computeOverall({ ...dims, lifestyle });
+      const overall = computeOverall({ ...dims, lifestyle: storedLifestyle ?? 0 });
       const scores = {
         overall,
         metabolic:      dims.metabolic ?? 0,
@@ -311,11 +311,11 @@ export async function saveExamBiomarkers(
       if (doc?.doctor_crm) {
         const { data: linked } = await supabase
           .from("doctor_patient_links")
-          .select("id")
+          .select("doctor_id")
           .eq("patient_id", user.id)
           .is("revoked_at", null);
 
-        const linkedDoctorIds = (linked ?? []).map((l) => l.id);
+        const linkedDoctorIds = (linked ?? []).map((l) => l.doctor_id);
         const { data: isLinked } = linkedDoctorIds.length > 0
           ? await supabase
               .from("doctor_profiles")
@@ -480,7 +480,7 @@ async function recalculateBiomarkersAfterDelete(
     storedLifestyle = currentScore?.lifestyle ?? 0;
   }
 
-  const overall = computeOverall({ ...dims, lifestyle });
+  const overall = computeOverall({ ...dims, lifestyle: storedLifestyle ?? 0 });
   await supabase.from("health_scores").upsert(
     {
       user_id:        userId,
