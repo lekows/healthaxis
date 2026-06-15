@@ -29,3 +29,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 scripts/output/
+
+# Claude Code local settings (use .claude/settings.example.json como referência)
+.claude/settings.json

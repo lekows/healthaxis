@@ -225,10 +225,11 @@ export async function POST(req: NextRequest) {
         extracted_at: new Date().toISOString(),
       }).eq("id", documentId).eq("user_id", user.id);
     } else {
-      supabase.from("documents").update({
+      const { error: errUpd } = await supabase.from("documents").update({
         extraction_status: "error",
         extraction_error: errorMsg ?? "Erro desconhecido.",
-      }).eq("id", documentId).eq("user_id", user.id).then(() => {});
+      }).eq("id", documentId).eq("user_id", user.id);
+      if (errUpd) console.error("[finalizeExtraction] update failed", errUpd);
     }
   };
 

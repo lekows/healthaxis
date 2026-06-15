@@ -53,21 +53,26 @@ export async function getWatchedBiomarkers(patientId: string, doctorId: string, 
   return data ?? [];
 }
 
+function sanitizeClinicalText(text: string): string {
+  const PRESCRIPTIVE = /prescrev|diagnos|tome\b|use\b|aplique|injete|cirurg/i;
+  return PRESCRIPTIVE.test(text)
+    ? text.replace(PRESCRIPTIVE, "[informação removida — linguagem prescritiva]")
+    : text;
+}
+
 export function composeConsultationBrief(raw: {
   summary: string;
   trendHighlights: TrendHighlight[];
   openQuestions: string[];
   confidence: number;
 }): ConsultationBrief {
-  const PRESCRIPTIVE = /prescrev|diagnos|tome |use |aplique |injete |cirurg/i;
-  const summary = PRESCRIPTIVE.test(raw.summary)
-    ? raw.summary.replace(PRESCRIPTIVE, "[informação removida — linguagem prescritiva]")
-    : raw.summary;
-
   return {
-    summary,
-    trendHighlights: (raw.trendHighlights ?? []).slice(0, 10),
-    openQuestions: (raw.openQuestions ?? []).slice(0, 8),
+    summary: sanitizeClinicalText(raw.summary ?? ""),
+    trendHighlights: (raw.trendHighlights ?? []).slice(0, 10).map((h) => ({
+      ...h,
+      note: sanitizeClinicalText(h.note ?? ""),
+    })),
+    openQuestions: (raw.openQuestions ?? []).slice(0, 8).map(sanitizeClinicalText),
     confidence: Math.max(0, Math.min(1, raw.confidence ?? 0)),
   };
 }

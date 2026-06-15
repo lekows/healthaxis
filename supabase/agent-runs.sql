@@ -1,8 +1,8 @@
 -- Camada de agentes: trilha de auditoria de execuções.
 -- Rodar uma vez no SQL editor do Supabase.
 
-create type agent_run_status as enum ('running', 'completed', 'failed', 'halted');
-create type agent_human_decision as enum ('pending', 'accepted', 'edited', 'rejected');
+create type if not exists agent_run_status as enum ('running', 'completed', 'failed', 'halted');
+create type if not exists agent_human_decision as enum ('pending', 'accepted', 'edited', 'rejected');
 
 create table if not exists public.agent_runs (
   id                  uuid primary key default gen_random_uuid(),
@@ -41,6 +41,7 @@ create index if not exists agent_runs_triggered_date on public.agent_runs (trigg
 alter table public.agent_runs enable row level security;
 
 -- Médico vinculado (link ativo) lê execuções do paciente
+drop policy if exists "linked doctor reads agent runs" on public.agent_runs;
 create policy "linked doctor reads agent runs" on public.agent_runs
   for select using (
     exists (
@@ -52,10 +53,18 @@ create policy "linked doctor reads agent runs" on public.agent_runs
   );
 
 -- Paciente lê suas próprias execuções
+drop policy if exists "patient reads own agent runs" on public.agent_runs;
 create policy "patient reads own agent runs" on public.agent_runs
   for select using (patient_id = auth.uid());
 
+-- Usuário que disparou a execução atualiza o lifecycle
+drop policy if exists "triggering user updates own agent run" on public.agent_runs;
+create policy "triggering user updates own agent run" on public.agent_runs
+  for update using (triggered_by = auth.uid())
+  with check (triggered_by = auth.uid());
+
 -- Médico registra decisão humana (accept / edit / reject)
+drop policy if exists "linked doctor decides on agent run" on public.agent_runs;
 create policy "linked doctor decides on agent run" on public.agent_runs
   for update using (
     exists (

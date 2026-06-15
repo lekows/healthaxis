@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
     // Custo estimado (preços Haiku + Sonnet por MTok)
     const estimatedCost = (totalInput / 1_000_000) * 0.80 + (totalOutput / 1_000_000) * 4.0;
 
-    await supabase.from("agent_runs").update({
+    const { error: completedErr } = await supabase.from("agent_runs").update({
       status: "completed",
       output_json: brief,
       tools_called: toolsLog,
@@ -239,14 +239,16 @@ export async function POST(req: NextRequest) {
       confidence_score: brief.confidence,
       completed_at: new Date().toISOString(),
     }).eq("id", agentRun.id);
+    if (completedErr) console.error("[consultation-prep] completed update failed:", completedErr);
 
     return NextResponse.json({ runId: agentRun.id, brief });
   } catch (err) {
-    await supabase.from("agent_runs").update({
+    const { error: failedErr } = await supabase.from("agent_runs").update({
       status: "failed",
       tools_called: toolsLog,
       completed_at: new Date().toISOString(),
     }).eq("id", agentRun.id);
+    if (failedErr) console.error("[consultation-prep] failed update error:", failedErr);
 
     console.error("[consultation-prep]", err);
     return NextResponse.json({ error: "Falha na execução do agente" }, { status: 500 });

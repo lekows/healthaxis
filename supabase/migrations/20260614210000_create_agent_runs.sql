@@ -45,7 +45,8 @@ create index if not exists agent_runs_triggered_date on public.agent_runs (trigg
 alter table public.agent_runs enable row level security;
 
 -- Médico vinculado (link ativo) lê execuções do paciente
-create policy if not exists "linked doctor reads agent runs" on public.agent_runs
+drop policy if exists "linked doctor reads agent runs" on public.agent_runs;
+create policy "linked doctor reads agent runs" on public.agent_runs
   for select using (
     exists (
       select 1 from public.doctor_patient_links l
@@ -56,15 +57,24 @@ create policy if not exists "linked doctor reads agent runs" on public.agent_run
   );
 
 -- Paciente lê suas próprias execuções
-create policy if not exists "patient reads own agent runs" on public.agent_runs
+drop policy if exists "patient reads own agent runs" on public.agent_runs;
+create policy "patient reads own agent runs" on public.agent_runs
   for select using (patient_id = auth.uid());
 
 -- Qualquer usuário autenticado pode criar uma execução onde é o triggering user
-create policy if not exists "authenticated users create agent runs" on public.agent_runs
+drop policy if exists "authenticated users create agent runs" on public.agent_runs;
+create policy "authenticated users create agent runs" on public.agent_runs
   for insert with check (triggered_by = auth.uid());
 
+-- Usuário que disparou a execução atualiza o lifecycle (status, output, tokens)
+drop policy if exists "triggering user updates own agent run" on public.agent_runs;
+create policy "triggering user updates own agent run" on public.agent_runs
+  for update using (triggered_by = auth.uid())
+  with check (triggered_by = auth.uid());
+
 -- Médico vinculado registra decisão humana (accept / edit / reject)
-create policy if not exists "linked doctor decides on agent run" on public.agent_runs
+drop policy if exists "linked doctor decides on agent run" on public.agent_runs;
+create policy "linked doctor decides on agent run" on public.agent_runs
   for update using (
     exists (
       select 1 from public.doctor_patient_links l

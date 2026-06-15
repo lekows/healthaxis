@@ -77,6 +77,18 @@ function salvageTruncatedPatterns(text: string): { patterns: unknown[]; notes: s
   return { patterns, notes: "", confidence: 0.7 };
 }
 
+async function canAnalyzePatient(patientId: string, userId: string, supabase: Awaited<ReturnType<typeof createClient>>) {
+  if (patientId === userId) return true;
+  const { data } = await supabase
+    .from("doctor_patient_links")
+    .select("id")
+    .eq("doctor_id", userId)
+    .eq("patient_id", patientId)
+    .is("revoked_at", null)
+    .maybeSingle();
+  return !!data;
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -84,6 +96,10 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json() as { patientId?: string };
   const patientId = body.patientId ?? user.id;
+
+  if (!(await canAnalyzePatient(patientId, user.id, supabase))) {
+    return NextResponse.json({ error: "Sem permissão para analisar este paciente" }, { status: 403 });
+  }
 
   const { data: agentRun, error: runErr } = await supabase
     .from("agent_runs")
@@ -128,7 +144,7 @@ export async function POST(req: NextRequest) {
     ]);
 
     if (!biomarkers || biomarkers.length === 0) {
-      await supabase.from("agent_runs").update({
+      const { error: emptyErr } = await supabase.from("agent_runs").update({
         status: "completed",
         output_json: { patterns: [], notes: "Nenhum biomarcador metabólico disponível.", confidence: 0 },
         iterations: 0,
@@ -139,6 +155,7 @@ export async function POST(req: NextRequest) {
         confidence_score: 0,
         completed_at: new Date().toISOString(),
       }).eq("id", agentRun.id);
+      if (emptyErr) console.error("[metabolic-analysis] update failed:", emptyErr);
 
       return NextResponse.json({ runId: agentRun.id, patterns: [], confidence: 0 });
     }
@@ -203,7 +220,7 @@ export async function POST(req: NextRequest) {
       ? Math.max(0, Math.min(1, output.confidence))
       : 0;
 
-    await supabase.from("agent_runs").update({
+    const { error: completedErr } = await supabase.from("agent_runs").update({
       status: "completed",
       output_json: output,
       iterations: 1,
@@ -214,13 +231,15 @@ export async function POST(req: NextRequest) {
       confidence_score: confidence,
       completed_at: new Date().toISOString(),
     }).eq("id", agentRun.id);
+    if (completedErr) console.error("[metabolic-analysis] completed update failed:", completedErr);
 
     return NextResponse.json({ runId: agentRun.id, ...output });
   } catch (err) {
-    await supabase.from("agent_runs").update({
+    const { error: failedErr } = await supabase.from("agent_runs").update({
       status: "failed",
       completed_at: new Date().toISOString(),
     }).eq("id", agentRun.id);
+    if (failedErr) console.error("[metabolic-analysis] failed update error:", failedErr);
 
     console.error("[metabolic-analysis]", err);
     return NextResponse.json({ error: "Falha na análise metabólica" }, { status: 500 });
