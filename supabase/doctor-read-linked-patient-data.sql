@@ -111,3 +111,16 @@ create policy "doctor reads linked patient health score"
         and doctor_patient_links.revoked_at is null
     )
   );
+
+-- ── health_scores_history ─────────────────────────────────────────────────────
+drop policy if exists "doctor reads linked patient health score history" on public.health_scores_history;
+create policy "doctor reads linked patient health score history"
+  on public.health_scores_history for select
+  using (
+    exists (
+      select 1 from public.doctor_patient_links
+      where doctor_patient_links.doctor_id = auth.uid()
+        and doctor_patient_links.patient_id = health_scores_history.user_id
+        and doctor_patient_links.revoked_at is null
+    )
+  );

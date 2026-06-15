@@ -5,13 +5,14 @@ export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/auth");
+  const isApiRoute = pathname.startsWith("/api/");
   const isPublicRoute = pathname === "/" || pathname.startsWith("/connect/") || pathname.startsWith("/share/");
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    if (!isAuthRoute && !isPublicRoute) {
+    if (!isAuthRoute && !isPublicRoute && !isApiRoute) {
       return NextResponse.redirect(new URL("/auth/login", request.url));
     }
     return supabaseResponse;
@@ -36,7 +37,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user && !isAuthRoute && !isPublicRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute && !isApiRoute) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 

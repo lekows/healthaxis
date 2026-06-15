@@ -101,19 +101,37 @@ export async function getTimelineEvents() {
   return data ?? [];
 }
 
+const FEMALE_ONLY_TERMS = ["ginecolog", "papanicolau", "mamografia", "colposcopia", "citologia cervical"];
+const MALE_ONLY_TERMS   = ["próstata", "prostata", "psa ", "antígeno prostático", "antigeno prostatico", "testícul", "testicul", "espermograma", "androlog"];
+
 export async function getPreventiveReminders() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data } = await supabase
-    .from("preventive_reminders")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("done", false)
-    .order("due_date");
+  const [{ data: reminders }, { data: profile }] = await Promise.all([
+    supabase
+      .from("preventive_reminders")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("done", false)
+      .order("due_date"),
+    supabase
+      .from("profiles")
+      .select("sex")
+      .eq("id", user.id)
+      .single(),
+  ]);
 
-  return data ?? [];
+  const all = reminders ?? [];
+  const sex = profile?.sex;
+  if (!sex || sex === "outro") return all;
+
+  const blocked = sex === "masculino" ? FEMALE_ONLY_TERMS : MALE_ONLY_TERMS;
+  return all.filter((r) => {
+    const text = `${r.title} ${r.description ?? ""}`.toLowerCase();
+    return !blocked.some((term) => text.includes(term));
+  });
 }
 
 export async function getHealthScore() {
@@ -156,4 +174,22 @@ export async function getHealthScoreHistory() {
     .order("recorded_at");
 
   return data ?? [];
+}
+
+export async function getLatestMetabolicAnalysis() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("agent_runs")
+    .select("id, output_json, confidence_score, completed_at")
+    .eq("patient_id", user.id)
+    .eq("agent_name", "metabolic_analysis")
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data;
 }
