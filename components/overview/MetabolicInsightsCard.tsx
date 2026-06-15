@@ -95,11 +95,22 @@ function PatternCard({ p }: { p: MetabolicPattern }) {
   );
 }
 
+function severityOrder(p: MetabolicPattern): number {
+  if (p.type === "concern" && p.relevance === "high") return 0;
+  if (p.type === "concern" || p.type === "mixed") return 1;
+  if (p.type === "protective") return 2;
+  // fallback sem type
+  if (p.relevance === "high") return 0;
+  if (p.relevance === "medium") return 1;
+  return 2;
+}
+
 export function MetabolicInsightsCard({ run }: Props) {
   const output = parseOutput(run.output_json);
   if (!output) return null;
   if (output.patterns.length === 0 && !output.notes) return null;
 
+  const sorted = [...output.patterns].sort((a, b) => severityOrder(a) - severityOrder(b));
   const confidence = Math.round((run.confidence_score ?? output.confidence) * 100);
   const runDate = run.completed_at
     ? new Date(run.completed_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
@@ -124,7 +135,7 @@ export function MetabolicInsightsCard({ run }: Props) {
         </p>
       ) : (
         <div className="space-y-2">
-          {output.patterns.map((p, i) => <PatternCard key={i} p={p} />)}
+          {sorted.map((p, i) => <PatternCard key={i} p={p} />)}
         </div>
       )}
 
