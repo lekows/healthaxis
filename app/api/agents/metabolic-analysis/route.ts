@@ -49,10 +49,89 @@ Campo type:
 - "mixed": achados mistos — alguns ótimos, outros alterados no mesmo padrão.`;
 
 const METABOLIC_CATEGORIES = ["Glicemia", "Lipídios", "Função Hepática", "Função Renal", "Hormônios", "Inflamação"];
+const RELEVANCE_VALUES = new Set(["high", "medium", "low"]);
+const PATTERN_TYPES = new Set(["protective", "concern", "mixed"]);
+
+const CLINICAL_DIRECTIVE_PATTERNS = [
+  /\bdiagnostique\b/gi,
+  /\bprescreva\b/gi,
+  /\btome\b/gi,
+  /\buse\b/gi,
+  /\bencaminhe\b(?:\s+para)?/gi,
+];
+
+type AgentPattern = {
+  name: string;
+  summary: string;
+  description: string;
+  evidence: string[];
+  relevance: "high" | "medium" | "low";
+  type: "protective" | "concern" | "mixed";
+};
+
+type AgentOutput = {
+  patterns: AgentPattern[];
+  notes: string;
+  confidence: number;
+};
+
+function sanitizeClinicalText(value: unknown, maxLength: number): string {
+  if (typeof value !== "string") return "";
+
+  let text = value
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  for (const pattern of CLINICAL_DIRECTIVE_PATTERNS) {
+    text = text.replace(pattern, "[orientação removida]");
+  }
+
+  return text.slice(0, maxLength);
+}
+
+function sanitizeAgentOutput(raw: unknown): AgentOutput {
+  const input = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const rawPatterns = Array.isArray(input.patterns) ? input.patterns : [];
+
+  const patterns = rawPatterns
+    .filter((pattern): pattern is Record<string, unknown> => !!pattern && typeof pattern === "object")
+    .map((pattern) => {
+      const relevance = typeof pattern.relevance === "string" && RELEVANCE_VALUES.has(pattern.relevance)
+        ? pattern.relevance as AgentPattern["relevance"]
+        : "medium";
+      const type = typeof pattern.type === "string" && PATTERN_TYPES.has(pattern.type)
+        ? pattern.type as AgentPattern["type"]
+        : "mixed";
+      const evidence = Array.isArray(pattern.evidence)
+        ? pattern.evidence.map((item) => sanitizeClinicalText(item, 240)).filter(Boolean).slice(0, 8)
+        : [];
+
+      return {
+        name: sanitizeClinicalText(pattern.name, 120),
+        summary: sanitizeClinicalText(pattern.summary, 220),
+        description: sanitizeClinicalText(pattern.description, 900),
+        evidence,
+        relevance,
+        type,
+      };
+    })
+    .filter((pattern) => pattern.name || pattern.summary || pattern.description || pattern.evidence.length > 0);
+
+  const confidence = typeof input.confidence === "number"
+    ? Math.max(0, Math.min(1, input.confidence))
+    : 0;
+
+  return {
+    patterns,
+    notes: sanitizeClinicalText(input.notes, 600),
+    confidence,
+  };
+}
 
 // Recupera os padrões completos de um JSON truncado por estouro de tokens.
 // Mantém apenas os objetos do array "patterns" que fecham corretamente.
-function salvageTruncatedPatterns(text: string): { patterns: unknown[]; notes: string; confidence: number } | null {
+function salvageTruncatedPatterns(text: string): AgentOutput | null {
   const start = text.indexOf('"patterns"');
   if (start === -1) return null;
   const arrStart = text.indexOf("[", start);
@@ -74,7 +153,7 @@ function salvageTruncatedPatterns(text: string): { patterns: unknown[]; notes: s
   }
 
   if (patterns.length === 0) return null;
-  return { patterns, notes: "", confidence: 0.7 };
+  return sanitizeAgentOutput({ patterns, notes: "", confidence: 0.7 });
 }
 
 export async function POST(req: NextRequest) {
@@ -82,8 +161,35 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
-  const body = await req.json() as { patientId?: string };
-  const patientId = body.patientId ?? user.id;
+  let body: { patientId?: string } = {};
+  try {
+    body = await req.json() as { patientId?: string };
+  } catch {
+    body = {};
+  }
+
+  const patientId = typeof body.patientId === "string" && body.patientId.trim()
+    ? body.patientId.trim()
+    : user.id;
+
+  if (patientId !== user.id) {
+    const { data: link, error: linkErr } = await supabase
+      .from("doctor_patient_links")
+      .select("id")
+      .eq("doctor_id", user.id)
+      .eq("patient_id", patientId)
+      .is("revoked_at", null)
+      .maybeSingle();
+
+    if (linkErr) {
+      console.error("[metabolic-analysis] authorization lookup failed:", linkErr);
+      return NextResponse.json({ error: "Falha ao validar autorização" }, { status: 500 });
+    }
+
+    if (!link) {
+      return NextResponse.json({ error: "Paciente não autorizado para este usuário" }, { status: 403 });
+    }
+  }
 
   const { data: agentRun, error: runErr } = await supabase
     .from("agent_runs")
@@ -112,7 +218,7 @@ export async function POST(req: NextRequest) {
     const cutoff = new Date();
     cutoff.setMonth(cutoff.getMonth() - 24);
 
-    const [{ data: biomarkers }, { data: history }] = await Promise.all([
+    const [biomarkersResult, historyResult] = await Promise.all([
       supabase
         .from("biomarkers")
         .select("name, slug, category, value, unit, status, trend, last_date")
@@ -127,10 +233,17 @@ export async function POST(req: NextRequest) {
         .order("recorded_at"),
     ]);
 
+    if (biomarkersResult.error) throw biomarkersResult.error;
+    if (historyResult.error) throw historyResult.error;
+
+    const biomarkers = biomarkersResult.data;
+    const history = historyResult.data;
+
     if (!biomarkers || biomarkers.length === 0) {
-      await supabase.from("agent_runs").update({
+      const emptyOutput: AgentOutput = { patterns: [], notes: "Nenhum biomarcador metabólico disponível.", confidence: 0 };
+      const { error: completeErr } = await supabase.from("agent_runs").update({
         status: "completed",
-        output_json: { patterns: [], notes: "Nenhum biomarcador metabólico disponível.", confidence: 0 },
+        output_json: emptyOutput,
         iterations: 0,
         model_used: HAIKU,
         tokens_input: 0,
@@ -140,7 +253,12 @@ export async function POST(req: NextRequest) {
         completed_at: new Date().toISOString(),
       }).eq("id", agentRun.id);
 
-      return NextResponse.json({ runId: agentRun.id, patterns: [], confidence: 0 });
+      if (completeErr) {
+        console.error("[metabolic-analysis] audit completion update failed:", completeErr);
+        return NextResponse.json({ error: "agent_audit_update_failed" }, { status: 500 });
+      }
+
+      return NextResponse.json({ runId: agentRun.id, ...emptyOutput });
     }
 
     // Agrupa histórico por slug dos biomarcadores metabólicos
@@ -180,7 +298,7 @@ export async function POST(req: NextRequest) {
     const estimatedCost = (totalInput / 1_000_000) * 0.80 + (totalOutput / 1_000_000) * 4.0;
 
     const textBlock = response.content.find((b) => b.type === "text");
-    let output: { patterns: unknown[]; notes: string; confidence: number } = {
+    let output: AgentOutput = {
       patterns: [],
       notes: "Falha ao parsear resposta do modelo.",
       confidence: 0,
@@ -189,7 +307,7 @@ export async function POST(req: NextRequest) {
     if (textBlock?.type === "text") {
       const jsonStr = textBlock.text.match(/\{[\s\S]*\}/)?.[0] ?? "{}";
       try {
-        output = JSON.parse(jsonStr);
+        output = sanitizeAgentOutput(JSON.parse(jsonStr));
       } catch {
         // JSON truncado (estouro de tokens): salva os padrões completos
         // recortando o array antes do último item incompleto.
@@ -199,11 +317,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const confidence = typeof output.confidence === "number"
-      ? Math.max(0, Math.min(1, output.confidence))
-      : 0;
-
-    await supabase.from("agent_runs").update({
+    const { error: completeErr } = await supabase.from("agent_runs").update({
       status: "completed",
       output_json: output,
       iterations: 1,
@@ -211,16 +325,25 @@ export async function POST(req: NextRequest) {
       tokens_input: totalInput,
       tokens_output: totalOutput,
       estimated_cost: estimatedCost,
-      confidence_score: confidence,
+      confidence_score: output.confidence,
       completed_at: new Date().toISOString(),
     }).eq("id", agentRun.id);
 
+    if (completeErr) {
+      console.error("[metabolic-analysis] audit completion update failed:", completeErr);
+      return NextResponse.json({ error: "agent_audit_update_failed" }, { status: 500 });
+    }
+
     return NextResponse.json({ runId: agentRun.id, ...output });
   } catch (err) {
-    await supabase.from("agent_runs").update({
+    const { error: failedUpdateErr } = await supabase.from("agent_runs").update({
       status: "failed",
       completed_at: new Date().toISOString(),
     }).eq("id", agentRun.id);
+
+    if (failedUpdateErr) {
+      console.error("[metabolic-analysis] audit failure update failed:", failedUpdateErr);
+    }
 
     console.error("[metabolic-analysis]", err);
     return NextResponse.json({ error: "Falha na análise metabólica" }, { status: 500 });
