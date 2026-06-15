@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
   Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode,
-  Heart, FolderOpen, MoreHorizontal, ChevronDown, X, type LucideIcon
+  Heart, MoreHorizontal, ChevronDown, X, type LucideIcon
 } from "lucide-react";
 import { ease } from "@/lib/motion";
 import { signOut } from "@/app/auth/actions";
@@ -24,7 +24,6 @@ const primaryNav: NavItem[] = [
 const baseSecondaryNav: NavItem[] = [
   { href: "/body-map", label: "Mapa Corporal", icon: Activity },
   { href: "/timeline", label: "Linha do Tempo", icon: Clock },
-  { href: "/documents", label: "Documentos", icon: FolderOpen },
   { href: "/anamnesis", label: "Anamnese", icon: ClipboardList },
   { href: "/report", label: "Relatório", icon: FileText },
   { href: "/share", label: "Compartilhar", icon: QrCode }

@@ -5,7 +5,7 @@ interface EmptyStateProps {
   icon: LucideIcon;
   title: string;
   description: string;
-  action?: { label: string; href: string };
+  action?: { label: string; href?: string; onClick?: () => void };
 }
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
@@ -20,13 +20,23 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
       <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{title}</p>
       <p className="text-xs mt-1 max-w-xs" style={{ color: "#5A5A50" }}>{description}</p>
       {action && (
-        <Link
-          href={action.href}
-          className="mt-4 px-4 py-2 rounded-2xl text-sm font-medium transition-colors"
-          style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.2)" }}
-        >
-          {action.label}
-        </Link>
+        action.onClick ? (
+          <button
+            onClick={action.onClick}
+            className="mt-4 px-4 py-2 rounded-2xl text-sm font-medium transition-colors"
+            style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.2)" }}
+          >
+            {action.label}
+          </button>
+        ) : (
+          <Link
+            href={action.href!}
+            className="mt-4 px-4 py-2 rounded-2xl text-sm font-medium transition-colors"
+            style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.2)" }}
+          >
+            {action.label}
+          </Link>
+        )
       )}
     </div>
   );

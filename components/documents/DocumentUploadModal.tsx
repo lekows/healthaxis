@@ -35,7 +35,7 @@ function namesMismatch(profileName: string, examName: string): boolean {
 // ── Modal ────────────────────────────────────────────────────────────────────
 interface ModalProps { onClose: () => void; userName?: string; }
 
-function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
+export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const router        = useRouter();
   const pdfInputRef   = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
