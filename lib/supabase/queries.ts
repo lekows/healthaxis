@@ -101,8 +101,8 @@ export async function getTimelineEvents() {
   return data ?? [];
 }
 
-// Lembretes exclusivos do sexo feminino — ocultados para perfis masculinos.
 const FEMALE_ONLY_TERMS = ["ginecolog", "papanicolau", "mamografia", "colposcopia", "citologia cervical"];
+const MALE_ONLY_TERMS   = ["próstata", "prostata", "psa ", "antígeno prostático", "antigeno prostatico", "testícul", "testicul", "espermograma", "androlog"];
 
 export async function getPreventiveReminders() {
   const supabase = await createClient();
@@ -124,11 +124,13 @@ export async function getPreventiveReminders() {
   ]);
 
   const all = reminders ?? [];
-  if (profile?.sex !== "masculino") return all;
+  const sex = profile?.sex;
+  if (!sex || sex === "outro") return all;
 
+  const blocked = sex === "masculino" ? FEMALE_ONLY_TERMS : MALE_ONLY_TERMS;
   return all.filter((r) => {
     const text = `${r.title} ${r.description ?? ""}`.toLowerCase();
-    return !FEMALE_ONLY_TERMS.some((term) => text.includes(term));
+    return !blocked.some((term) => text.includes(term));
   });
 }
 
