@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { ClipboardList, CheckCircle2, Circle } from "lucide-react";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 
 const sections = [
   {
@@ -45,13 +46,14 @@ const sections = [
   }
 ];
 
-export default function AnamnesisPage() {
+export default async function AnamnesisPage() {
+  const isDoctor = await getIsDoctor();
   const totalFields = sections.flatMap(s => s.fields).length;
   const doneFields = sections.flatMap(s => s.fields).filter(f => f.done).length;
   const pct = Math.round((doneFields / totalFields) * 100);
 
   return (
-    <DashboardLayout>
+    <DashboardLayout isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
 
         <div>

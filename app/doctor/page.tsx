@@ -25,7 +25,7 @@ export default async function DoctorPage() {
   const activeInvite = invites[0] ?? null;
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={!!doctorProfile}>
       <div className="p-6 lg:p-8 max-w-2xl mx-auto space-y-8">
 
         <div className="flex items-center gap-3">

@@ -2,17 +2,19 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getBiomarkers, getBiomarkerHistory, getDocuments, getProfile } from "@/lib/supabase/queries";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 import { FlaskConical, AlertTriangle } from "lucide-react";
 import { BiomarkerTrendCard, HealthMetricCard } from "@/components/dashboard/MetricCards";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ManualBiomarkerModal } from "@/components/exams/ManualBiomarkerModal";
 
 export default async function ExamsPage() {
-  const [profile, biomarkers, history, documents] = await Promise.all([
+  const [profile, biomarkers, history, documents, isDoctor] = await Promise.all([
     getProfile(),
     getBiomarkers(),
     getBiomarkerHistory(),
     getDocuments(),
+    getIsDoctor(),
   ]);
 
   const historyBySlug = history.reduce<Record<string, { date: string; value: number }[]>>((acc, h) => {
@@ -29,7 +31,7 @@ export default async function ExamsPage() {
   const statusVariant: Record<string, "warning" | "danger"> = { attention: "warning", high: "danger", low: "warning", critical: "danger" };
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
 
         <div className="flex items-center justify-between">

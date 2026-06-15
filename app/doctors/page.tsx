@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { getDoctors, getProfile } from "@/lib/supabase/queries";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 import { Stethoscope, ExternalLink, Calendar, FileText } from "lucide-react";
 
 function daysSince(dateStr: string | null): number {
@@ -17,10 +18,10 @@ function MonthsAgoLabel({ dateStr }: { dateStr: string | null }) {
 }
 
 export default async function DoctorsPage() {
-  const [profile, doctors] = await Promise.all([getProfile(), getDoctors()]);
+  const [profile, doctors, isDoctor] = await Promise.all([getProfile(), getDoctors(), getIsDoctor()]);
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
 
         <div>

@@ -8,7 +8,7 @@ export default async function DoctorSetupPage() {
   const [profile, doctorProfile] = await Promise.all([getProfile(), getDoctorProfile()]);
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={!!doctorProfile}>
       <div className="p-6 lg:p-8 max-w-xl mx-auto space-y-8">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center"

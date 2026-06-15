@@ -4,13 +4,15 @@ import { HealthOverview } from "@/components/dashboard/HealthOverview";
 import { ScoreEvolutionChart } from "@/components/dashboard/ScoreEvolutionChart";
 import { MetabolicAnalysisSection } from "@/components/overview/MetabolicAnalysisSection";
 import { getHealthScore, getHealthScoreHistory, getProfile, getLatestMetabolicAnalysis } from "@/lib/supabase/queries";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 
 export default async function HealthOverviewPage() {
-  const [profile, score, history, metabolicRun] = await Promise.all([
+  const [profile, score, history, metabolicRun, isDoctor] = await Promise.all([
     getProfile(),
     getHealthScore(),
     getHealthScoreHistory(),
     getLatestMetabolicAnalysis(),
+    getIsDoctor(),
   ]);
 
   const current = score ?? { overall: 0, metabolic: 0, cardiovascular: 0, lifestyle: 0, preventive: 0 };
@@ -25,7 +27,7 @@ export default async function HealthOverviewPage() {
   }));
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
 
         <div>

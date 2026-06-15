@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getDocuments, getProfile } from "@/lib/supabase/queries";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 import { FolderOpen, FileText, FlaskConical, Image as ImageIcon, CheckCircle, Clock } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { UploadDocumentButton } from "@/components/documents/DocumentUploadModal";
@@ -14,12 +15,12 @@ const typeIcon: Record<string, React.ElementType> = {
 };
 
 export default async function DocumentsPage() {
-  const [profile, documents] = await Promise.all([getProfile(), getDocuments()]);
+  const [profile, documents, isDoctor] = await Promise.all([getProfile(), getDocuments(), getIsDoctor()]);
 
   const reviewed = documents.filter(d => d.status === "reviewed").length;
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-8">
 
         <div className="flex items-start justify-between flex-wrap gap-4">
