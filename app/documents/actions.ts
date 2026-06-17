@@ -158,11 +158,21 @@ export async function saveExamBiomarkers(
 
     const resolved = normalizedEntries.map((e) => {
       const hasLabRef = e.ref_min !== null || e.ref_max !== null;
+      const labRef = hasLabRef
+        ? {
+            ...(e.ref_min !== null ? { min: e.ref_min } : {}),
+            ...(e.ref_max !== null ? { max: e.ref_max } : {}),
+          }
+        : null;
       const staticRef = getReference(e.slug, sex, ageYears);
+      // Static canonical reference takes priority; lab ref is the fallback.
+      // Status is always recomputed server-side from the same reference that will be stored,
+      // so the two fields can never be inconsistent (fixes B12=829 stored as "high").
+      const effectiveRef = staticRef ?? labRef;
       return {
         ...e,
-        reference: staticRef ?? e.reference,
-        status: hasLabRef ? e.status : (staticRef ? inferStatus(e.value, staticRef) : e.status),
+        reference: effectiveRef ?? e.reference,
+        status: effectiveRef ? inferStatus(e.value, effectiveRef) : e.status,
         trend: computeTrend(e.value, priorValue(e.slug, e.historico ?? [])),
       };
     });

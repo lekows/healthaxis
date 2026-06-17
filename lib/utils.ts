@@ -21,7 +21,7 @@ export function getBiomarkerColor(status: string): string {
     case "optimal":   return "#52B788";
     case "attention": return "#F4A261";
     case "critical":  return "#C1440E";
-    case "high":      return "#C1440E";
+    case "high":      return "#F4A261";
     case "low":       return "#F4A261";
     default:          return "#8A8A80";
   }
