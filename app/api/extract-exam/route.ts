@@ -289,7 +289,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ...examData,
         identificador_externo: examData.identificador_externo ?? extractKnownExternalIdentifier(pastedText),
-        _debug_raw: responseText.substring(0, 4000),
+        ...(process.env.NODE_ENV === "development" && { _debug_raw: responseText.substring(0, 4000) }),
       });
     }
 
@@ -403,7 +403,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...examData,
       identificador_externo: deterministicIdentifier ?? examData.identificador_externo,
-      _debug_raw: responseText.substring(0, 4000),
+      ...(process.env.NODE_ENV === "development" && { _debug_raw: responseText.substring(0, 4000) }),
     });
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
