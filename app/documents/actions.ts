@@ -583,6 +583,48 @@ export async function deleteDocument(documentId: string): Promise<{ error?: stri
   return {};
 }
 
+export async function recalculateAllBiomarkerStatuses(): Promise<{ error?: string; updated?: number }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Sessão expirada." };
+
+    const { data: profile } = await supabase.from("profiles").select("sex, dob").eq("id", user.id).single();
+    const sex = (profile?.sex as string | null) ?? null;
+    const ageYears = profile?.dob
+      ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25 * 24 * 3600 * 1000))
+      : null;
+
+    const { data: biomarkers } = await supabase
+      .from("biomarkers")
+      .select("slug, value, status")
+      .eq("user_id", user.id);
+
+    if (!biomarkers || biomarkers.length === 0) return { updated: 0 };
+
+    let updated = 0;
+    for (const b of biomarkers) {
+      const slug = canonicalSlug(b.slug);
+      const staticRef = getReference(slug, sex, ageYears);
+      if (!staticRef) continue;
+      const newStatus = inferStatus(Number(b.value), staticRef);
+      if (newStatus === b.status) continue;
+      await supabase.from("biomarkers")
+        .update({ status: newStatus })
+        .eq("user_id", user.id)
+        .eq("slug", b.slug);
+      updated++;
+    }
+
+    revalidatePath("/exams");
+    revalidatePath("/dashboard");
+    revalidatePath("/overview");
+    return { updated };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erro inesperado ao recalcular." };
+  }
+}
+
 function toDateLabel(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
