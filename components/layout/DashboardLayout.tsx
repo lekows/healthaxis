@@ -28,8 +28,8 @@ const navItems = [
 const primaryNav = [
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/exams", label: "Exames", icon: FlaskConical },
-  { href: "/documents", label: "Documentos", icon: FolderOpen },
   { href: "/overview", label: "Visão Geral", icon: BarChart2 },
+  { href: "/documents", label: "Documentos", icon: FolderOpen },
   { href: "/profile", label: "Perfil", icon: User },
 ];
 
