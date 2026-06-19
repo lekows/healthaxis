@@ -85,7 +85,7 @@ export default async function DoctorPatientPage({ params }: Props) {
   const ageLabel = age(panel.patient?.dob ?? null);
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={!!doctorProfile}>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
 
         <Link href="/doctor" className="inline-flex items-center gap-2 text-sm transition-all hover:opacity-80" style={{ color: "#9A9688" }}>

@@ -5,11 +5,12 @@ import { PreventiveReminderCard, RiskAreaCard, RecentDocumentCard } from "@/comp
 import { CollapsibleList } from "@/components/dashboard/CollapsibleList";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getHealthScore, getDoctors } from "@/lib/supabase/queries";
-import { Activity, TrendingUp, FileText, Bell, ArrowRight, FlaskConical, Stethoscope, Upload } from "lucide-react";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
+import { Activity, Clock, FileText, Bell, ArrowRight, FlaskConical, Stethoscope, Upload } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default async function DashboardPage() {
-  const [profile, biomarkers, history, documents, reminders, healthScore, doctors] = await Promise.all([
+  const [profile, biomarkers, history, documents, reminders, healthScore, doctors, isDoctor] = await Promise.all([
     getProfile(),
     getBiomarkers(),
     getBiomarkerHistory(),
@@ -17,6 +18,7 @@ export default async function DashboardPage() {
     getPreventiveReminders(),
     getHealthScore(),
     getDoctors(),
+    getIsDoctor(),
   ]);
 
   const userName = profile?.name ?? "Usuário";
@@ -37,6 +39,24 @@ export default async function DashboardPage() {
 
   const urgentReminders = reminders.filter(r => r.priority === "high").length;
 
+  const examTimestamps = documents.map(d => new Date(d.date).getTime()).filter(t => Number.isFinite(t));
+  const lastExamTs = examTimestamps.length ? Math.max(...examTimestamps) : null;
+  const lastExamDays = lastExamTs !== null ? Math.floor((Date.now() - lastExamTs) / 86400000) : null;
+  const lastExamValue = lastExamTs !== null ? new Date(lastExamTs).toLocaleDateString("pt-BR") : "—";
+  function lastExamRelative(days: number): string {
+    if (days <= 0) return "hoje";
+    if (days === 1) return "há 1 dia";
+    if (days < 30) return `há ${days} dias`;
+    if (days < 365) {
+      const months = Math.floor(days / 30);
+      return `há ${months} ${months === 1 ? "mês" : "meses"}`;
+    }
+    const years = Math.floor(days / 365);
+    return `há ${years} ano${years > 1 ? "s" : ""}`;
+  }
+  const lastExamSub = lastExamDays === null ? "nenhum exame" : lastExamRelative(lastExamDays);
+  const lastExamColor = lastExamTs === null ? "#5A5A50" : lastExamDays !== null && lastExamDays > 180 ? "#F4A261" : "#52B788";
+
   const hasNonOptimal = biomarkers.some(b => b.status !== "optimal");
   const overdueDoctoralerts = doctors.filter(doc => {
     if (!doc.last_exam_date) return false;
@@ -45,7 +65,7 @@ export default async function DashboardPage() {
   }).slice(0, 2);
 
   return (
-    <DashboardLayout userName={userName}>
+    <DashboardLayout userName={userName} isDoctor={isDoctor}>
       <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-5 lg:space-y-8">
 
         {/* Header */}
@@ -98,7 +118,7 @@ export default async function DashboardPage() {
               { icon: FileText, label: "Documentos", value: String(documents.length), sub: `${documents.filter(d => d.status === "reviewed").length} revisados`, color: "#52B788" },
               { icon: Activity, label: "Biomarcadores", value: String(biomarkers.length), sub: `${biomarkers.filter(b => b.status === "optimal").length} em dia`, color: "#52B788" },
               { icon: Bell, label: "Lembretes", value: String(reminders.length), sub: `${urgentReminders} urgentes`, color: urgentReminders > 0 ? "#C1440E" : "#52B788" },
-              { icon: TrendingUp, label: "Atualização", value: "Hoje", sub: "dados reais", color: "#9A9688" }
+              { icon: Clock, label: "Último exame", value: lastExamValue, sub: lastExamSub, color: lastExamColor }
             ].map(({ icon: Icon, label, value, sub, color }) => (
               <div key={label} className="shrink-0 w-36 sm:w-auto p-4 sm:p-5 rounded-3xl flex flex-col gap-2 sm:gap-3"
                 style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>

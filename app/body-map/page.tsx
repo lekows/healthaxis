@@ -1,10 +1,12 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { BodyMap } from "@/components/dashboard/BodyMap";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 
-export default function BodyMapPage() {
+export default async function BodyMapPage() {
+  const isDoctor = await getIsDoctor();
   return (
-    <DashboardLayout>
+    <DashboardLayout isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "#E8E4D9" }}>Mapa Corporal</h1>

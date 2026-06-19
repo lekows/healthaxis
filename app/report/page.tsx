@@ -2,15 +2,17 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge, Button } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getBiomarkers, getMedications, getFamilyHistory, getPreventiveReminders } from "@/lib/supabase/queries";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 import { FileText, Download, Share2, Printer, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default async function ReportPage() {
-  const [profile, biomarkers, medications, familyHistory, reminders] = await Promise.all([
+  const [profile, biomarkers, medications, familyHistory, reminders, isDoctor] = await Promise.all([
     getProfile(),
     getBiomarkers(),
     getMedications(),
     getFamilyHistory(),
     getPreventiveReminders(),
+    getIsDoctor(),
   ]);
 
   const today = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
@@ -26,7 +28,7 @@ export default async function ReportPage() {
     : null;
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
 
         <div className="flex items-start justify-between flex-wrap gap-4">

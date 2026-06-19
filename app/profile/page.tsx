@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, Badge } from "@/components/ui";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getMedications, getFamilyHistory } from "@/lib/supabase/queries";
-import { getLinkedDoctors, getWatchedBiomarkersByPatient } from "@/lib/supabase/doctor-queries";
+import { getLinkedDoctors, getWatchedBiomarkersByPatient, getIsDoctor } from "@/lib/supabase/doctor-queries";
 import { createClient } from "@/lib/supabase/server";
 import { Pill, Users, FlaskConical, Link2Off, Stethoscope } from "lucide-react";
 import { ProfileEditModal } from "@/components/profile/ProfileEditModal";
@@ -12,12 +12,13 @@ export default async function ProfilePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [profile, medications, familyHistory, linkedDoctors, watchedRaw] = await Promise.all([
+  const [profile, medications, familyHistory, linkedDoctors, watchedRaw, isDoctor] = await Promise.all([
     getProfile(),
     getMedications(),
     getFamilyHistory(),
     getLinkedDoctors(),
     user ? getWatchedBiomarkersByPatient(user.id) : Promise.resolve([]),
+    getIsDoctor(),
   ]);
 
   if (!profile) return null;
@@ -39,7 +40,7 @@ export default async function ProfilePage() {
     : null;
 
   return (
-    <DashboardLayout userName={profile.name}>
+    <DashboardLayout userName={profile.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
 
         <div className="flex items-start justify-between">

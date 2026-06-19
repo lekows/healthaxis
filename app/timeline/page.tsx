@@ -2,14 +2,15 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TimelineEventCard } from "@/components/dashboard/EventCards";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getTimelineEvents, getProfile } from "@/lib/supabase/queries";
+import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 
 export default async function TimelinePage() {
-  const [profile, events] = await Promise.all([getProfile(), getTimelineEvents()]);
+  const [profile, events, isDoctor] = await Promise.all([getProfile(), getTimelineEvents(), getIsDoctor()]);
 
   const years = [...new Set(events.map(e => new Date(e.date).getFullYear()))].sort((a, b) => b - a);
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
 
         <div>

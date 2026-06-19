@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile, getDocuments } from "@/lib/supabase/queries";
-import { getMySharedTokens } from "@/lib/supabase/doctor-queries";
+import { getMySharedTokens, getIsDoctor } from "@/lib/supabase/doctor-queries";
 import { ShareExamModal } from "@/components/patient/ShareExamModal";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { QrCode, Clock, X } from "lucide-react";
@@ -8,10 +8,11 @@ import { ShareRevokeClient } from "@/components/patient/ShareRevokeClient";
 import { headers } from "next/headers";
 
 export default async function SharePage() {
-  const [profile, documents, tokens] = await Promise.all([
+  const [profile, documents, tokens, isDoctor] = await Promise.all([
     getProfile(),
     getDocuments(),
     getMySharedTokens(),
+    getIsDoctor(),
   ]);
 
   const headersList = await headers();
@@ -22,7 +23,7 @@ export default async function SharePage() {
   const labDocs = documents.filter(d => d.type === "Exame Laboratorial");
 
   return (
-    <DashboardLayout userName={profile?.name}>
+    <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
       <div className="p-6 lg:p-8 max-w-2xl mx-auto space-y-8">
 
         <div className="flex items-center justify-between">
