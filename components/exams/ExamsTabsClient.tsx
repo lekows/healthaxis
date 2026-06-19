@@ -8,6 +8,7 @@ import {
 import { Card, Badge } from "@/components/ui";
 import { BiomarkerTrendCard, HealthMetricCard } from "@/components/dashboard/MetricCards";
 import { ManualBiomarkerModal } from "@/components/exams/ManualBiomarkerModal";
+import { RecalculateStatusButton } from "@/components/exams/RecalculateStatusButton";
 import { DocumentUploadModalInner } from "@/components/documents/DocumentUploadModal";
 import { DeleteDocumentButton } from "@/components/documents/DeleteDocumentButton";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -69,6 +70,7 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
           </p>
         </div>
         <div className="hidden lg:flex items-center gap-2">
+          {tab === "resultados" && <RecalculateStatusButton />}
           {tab === "resultados" && <ManualBiomarkerModal />}
           <button
             onClick={() => setUploadOpen(true)}

@@ -1,5 +1,4 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getBiomarkers, getBiomarkerHistory, getDocuments, getProfile } from "@/lib/supabase/queries";
 import { getIsDoctor } from "@/lib/supabase/doctor-queries";
 import { ExamsTabsClient } from "@/components/exams/ExamsTabsClient";

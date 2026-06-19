@@ -44,6 +44,14 @@ const SLUG_SYNONYMS: Record<string, string> = {
   // Iron
   "ferro":            "ferro-serico",
   "saturacao-de-transferrina": "saturacao-transferrina",
+  // Oxygen saturation (SpO2) — distinct from iron/transferrin saturation
+  "saturacao-de-oxigenio":          "saturacao-oxigenio",
+  "saturacao-periferica":           "saturacao-oxigenio",
+  "saturacao-periferica-de-oxigenio": "saturacao-oxigenio",
+  "saturacao-o2":                   "saturacao-oxigenio",
+  "spo2":                           "saturacao-oxigenio",
+  "sp02":                           "saturacao-oxigenio",
+  "oximetria-de-pulso":             "saturacao-oxigenio",
 };
 
 export function canonicalSlug(raw: string): string {

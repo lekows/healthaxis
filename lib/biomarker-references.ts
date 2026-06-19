@@ -87,6 +87,9 @@ const REFERENCES: Record<string, SexRanges> = {
   "vitamina-b12": { universal: { min: 200, max: 900 }, descricao: "Essencial para neurônios e glóbulos vermelhos. Deficiência causa fadiga e formigamentos." },
   "acido-folico": { universal: { min: 5.4 }, descricao: "Vitamina B9 — essencial para produção de células e DNA. Crítica na gravidez para prevenir malformações." },
 
+  // ── Oximetria ──────────────────────────────────────────────────────────
+  "saturacao-oxigenio": { universal: { min: 95, max: 100 }, descricao: "Percentual de hemoglobina saturada com oxigênio (SpO2). Valores abaixo de 95% indicam hipóxia e devem ser avaliados com urgência." },
+
   // ── Inflamação / Ferro ─────────────────────────────────────────────────
   "proteina-c-reativa":                    { universal: { max: 5 }, descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
   pcr:                                     { descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
@@ -172,6 +175,7 @@ const KEYWORD_ALIASES: [RegExp, string][] = [
   [/acido folico|folato/, "acido-folico"],
   [/ferritina/, "ferritina"],
   [/\btsh\b|tireoestimulante/, "tsh"],
+  [/saturacao.*(oxigenio|o2)|\bspo2\b|oximetria/, "saturacao-oxigenio"],
 ];
 
 export function getBiomarkerInfo(slug?: string | null, name?: string | null): string | null {
