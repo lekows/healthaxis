@@ -90,7 +90,7 @@ export function ScoreEvolutionChart({ data, current }: Props) {
 
       {/* Evolution chart */}
       {data.length > 1 ? (
-        <div className="p-5 rounded-3xl" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="p-5 rounded-3xl overflow-hidden" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#5A5A50" }}>Evolução histórica</p>
             <p className="text-xs" style={{ color: "#5A5A50" }}>Toque na legenda para filtrar</p>
@@ -115,12 +115,12 @@ export function ScoreEvolutionChart({ data, current }: Props) {
             })}
           </div>
 
-          <div className="h-52">
+          <div className="h-52 w-full overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+              <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -24 }}>
                 <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4" />
-                <XAxis dataKey="label" tick={{ fill: "#5A5A50", fontSize: 9 }} tickLine={false} axisLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "#5A5A50", fontSize: 9 }} tickLine={false} axisLine={false} width={32} />
+                <XAxis dataKey="label" tick={{ fill: "#5A5A50", fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: "#5A5A50", fontSize: 11 }} tickLine={false} axisLine={false} width={30} />
                 <Tooltip content={<CustomTooltip />} />
                 {LINES.filter(l => !hidden.has(l.key)).map(l => (
                   <Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color}

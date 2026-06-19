@@ -1,10 +1,11 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
-  FolderOpen, Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode, BarChart2
+  FolderOpen, Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode, BarChart2, MoreHorizontal, X
 } from "lucide-react";
 import { ease } from "@/lib/motion";
 import { signOut } from "@/app/auth/actions";
@@ -24,13 +25,29 @@ const navItems = [
   { href: "/profile", label: "Perfil", icon: User }
 ];
 
+const primaryNav = [
+  { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
+  { href: "/exams", label: "Exames", icon: FlaskConical },
+  { href: "/overview", label: "Visão Geral", icon: BarChart2 },
+  { href: "/documents", label: "Documentos", icon: FolderOpen },
+  { href: "/profile", label: "Perfil", icon: User },
+];
+
+const secondaryNav = navItems.filter(
+  (item) => !primaryNav.some((p) => p.href === item.href)
+);
+
 export function DashboardLayout({ children, userName }: { children: React.ReactNode; userName?: string | null }) {
   const pathname = usePathname();
   const displayName = userName?.trim() || "Usuário";
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const currentPageLabel = navItems.find((n) => n.href === pathname)?.label ?? "HealthAxis";
+  const isSecondaryActive = secondaryNav.some((n) => n.href === pathname);
 
   return (
     <div className="min-h-screen flex" style={{ background: "#0D0D0B", color: "#E8E4D9" }}>
-      {/* Sidebar */}
+      {/* Sidebar — desktop only */}
       <motion.aside
         className="hidden lg:flex flex-col w-64 fixed inset-y-0 z-30"
         style={{ background: "#0D0D0B", borderRight: "1px solid rgba(255,255,255,0.06)" }}
@@ -119,18 +136,44 @@ export function DashboardLayout({ children, userName }: { children: React.ReactN
       <div className="flex-1 lg:pl-64">
         {/* Mobile header */}
         <motion.header
-          className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-3"
-          style={{ background: "rgba(13,13,11,0.9)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4"
+          style={{
+            background: "rgba(13,13,11,0.9)",
+            backdropFilter: "blur(12px)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            height: "52px",
+          }}
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.4 }}
         >
-          <Link href="/" className="flex items-center gap-2">
+          {/* Logo */}
+          <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ background: "rgba(82,183,136,0.12)", border: "1px solid rgba(82,183,136,0.2)" }}>
               <Activity size={13} style={{ color: "#52B788" }} />
             </div>
-            <span className="font-semibold text-sm" style={{ color: "#E8E4D9" }}>HealthAxis</span>
+          </Link>
+
+          {/* Current page title */}
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={currentPageLabel}
+              className="text-sm font-semibold absolute left-1/2 -translate-x-1/2"
+              style={{ color: "#E8E4D9" }}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+            >
+              {currentPageLabel}
+            </motion.span>
+          </AnimatePresence>
+
+          {/* User avatar → /profile */}
+          <Link href="/profile" className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+            style={{ background: "rgba(82,183,136,0.18)", color: "#52B788" }}>
+            {displayName.charAt(0).toUpperCase()}
           </Link>
         </motion.header>
 
@@ -142,45 +185,138 @@ export function DashboardLayout({ children, userName }: { children: React.ReactN
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.35, ease: ease.out }}
-            className="min-h-screen lg:pb-0 pb-16"
+            className="min-h-screen lg:pb-0"
+            style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))" }}
           >
             {children}
           </motion.main>
         </AnimatePresence>
 
-        {/* Bottom navigation — mobile only, deslizável */}
+        {/* Bottom tab bar — mobile only, 5 primary tabs + Mais */}
         <nav
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-center gap-1 px-2 py-1 overflow-x-auto"
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 flex items-stretch"
           style={{
-            background: "rgba(13,13,11,0.92)",
+            background: "rgba(13,13,11,0.95)",
             backdropFilter: "blur(16px)",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            scrollSnapType: "x mandatory",
-            WebkitOverflowScrolling: "touch",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
+            borderTop: "1px solid rgba(255,255,255,0.07)",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            height: "calc(56px + env(safe-area-inset-bottom, 0px))",
           }}
         >
-          {navItems.map(({ href, icon: Icon, label }) => {
+          {primaryNav.map(({ href, icon: Icon, label }) => {
             const active = pathname === href;
             return (
-              <Link key={href} href={href}
-                className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors shrink-0"
-                style={{ color: active ? "#52B788" : "#5A5A50", scrollSnapAlign: "center" }}>
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMoreOpen(false)}
+                className="relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors"
+                style={{ color: active ? "#52B788" : "#5A5A50", minHeight: "56px" }}
+              >
                 {active && (
                   <motion.div
-                    layoutId="bottom-nav-active"
-                    className="absolute inset-0 rounded-2xl"
-                    style={{ background: "rgba(82,183,136,0.1)" }}
-                    transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                    layoutId="bottom-tab-active"
+                    className="absolute inset-x-1 top-0 h-0.5 rounded-full"
+                    style={{ background: "#52B788" }}
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
-                <Icon size={18} className="relative z-10" />
-                <span className="text-xs font-medium relative z-10">{label}</span>
+                <Icon size={20} className="relative z-10" />
+                <span className="text-xs font-medium relative z-10 leading-none">{label.split(" ")[0]}</span>
               </Link>
             );
           })}
+
+          {/* Mais button */}
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            className="relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors"
+            style={{ color: moreOpen || isSecondaryActive ? "#52B788" : "#5A5A50", minHeight: "56px" }}
+          >
+            {(moreOpen || isSecondaryActive) && !primaryNav.some((p) => p.href === pathname) && (
+              <motion.div
+                layoutId="bottom-tab-active"
+                className="absolute inset-x-1 top-0 h-0.5 rounded-full"
+                style={{ background: "#52B788" }}
+                transition={{ type: "spring", stiffness: 350, damping: 30 }}
+              />
+            )}
+            <MoreHorizontal size={20} className="relative z-10" />
+            <span className="text-xs font-medium relative z-10 leading-none">Mais</span>
+          </button>
         </nav>
+
+        {/* "Mais" bottom sheet */}
+        <AnimatePresence>
+          {moreOpen && (
+            <>
+              {/* Overlay */}
+              <motion.div
+                className="lg:hidden fixed inset-0 z-40"
+                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setMoreOpen(false)}
+              />
+
+              {/* Sheet */}
+              <motion.div
+                className="lg:hidden fixed left-0 right-0 z-50 rounded-t-3xl"
+                style={{
+                  bottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
+                  background: "#141412",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  borderBottom: "none",
+                }}
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", stiffness: 320, damping: 32 }}
+              >
+                {/* Handle + header */}
+                <div className="flex items-center justify-between px-5 pt-4 pb-3">
+                  <div className="w-8 h-1 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3"
+                    style={{ background: "rgba(255,255,255,0.15)" }} />
+                  <span className="text-sm font-semibold mt-2" style={{ color: "#E8E4D9" }}>Mais opções</span>
+                  <button
+                    onClick={() => setMoreOpen(false)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center mt-2"
+                    style={{ background: "rgba(255,255,255,0.06)", color: "#9A9688" }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Secondary nav grid */}
+                <div className="grid grid-cols-4 gap-1 px-3 pb-5">
+                  {secondaryNav.map(({ href, icon: Icon, label }) => {
+                    const active = pathname === href;
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={() => setMoreOpen(false)}
+                        className="flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl transition-colors"
+                        style={{
+                          color: active ? "#52B788" : "#9A9688",
+                          background: active ? "rgba(82,183,136,0.1)" : "rgba(255,255,255,0.03)",
+                        }}
+                      >
+                        <Icon size={20} />
+                        <span className="text-xs font-medium text-center leading-tight"
+                          style={{ color: active ? "#52B788" : "#9A9688" }}>
+                          {label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
