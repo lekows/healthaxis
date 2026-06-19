@@ -3,7 +3,7 @@ import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui";
 import { HoverCard, AnimatedProgressBar, StaggerContainer, StaggerItem, fadeUp } from "@/lib/motion";
-import { preventiveReminders, healthScore, biomarkers } from "@/data/mockData";
+import { preventiveReminders, biomarkers } from "@/data/mockData";
 import { getBiomarkerLabel } from "@/lib/utils";
 
 const checklist = [
@@ -51,44 +51,9 @@ export function PreventiveChecklist() {
 
 export function HealthOverview() {
   const attention = biomarkers.filter(b => b.status === "attention" || b.status === "risk");
-  const circumference = 2 * Math.PI * 40;
 
   return (
     <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <h1 className="text-2xl font-bold" style={{ color: "#E8E4D9" }}>Visão Geral de Saúde</h1>
-        <p className="text-sm mt-1" style={{ color: "#9A9688" }}>Panorama completo do seu estado preventivo.</p>
-      </motion.div>
-
-      {/* Score ring */}
-      <HoverCard className="rounded-3xl p-6 flex items-center gap-6" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <div className="relative w-24 h-24 shrink-0">
-          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
-            <motion.circle
-              cx="50" cy="50" r="40" fill="none" stroke="#52B788" strokeWidth="10" strokeLinecap="round"
-              initial={{ strokeDasharray: `0 ${circumference}` }}
-              animate={{ strokeDasharray: `${circumference * healthScore.overall / 100} ${circumference}` }}
-              transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.span className="text-2xl font-bold" style={{ color: "#E8E4D9" }}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-              {healthScore.overall}
-            </motion.span>
-          </div>
-        </div>
-        <div>
-          <p className="text-lg font-bold" style={{ color: "#E8E4D9" }}>Índice Preventivo</p>
-          <p className="text-sm mt-1 leading-relaxed" style={{ color: "#9A9688" }}>
-            Sua pontuação está{" "}
-            <span className="font-semibold" style={{ color: "#52B788" }}>acima da média</span>{" "}
-            para seu perfil.
-          </p>
-        </div>
-      </HoverCard>
-
       {/* Attention markers */}
       {attention.length > 0 && (
         <div>
