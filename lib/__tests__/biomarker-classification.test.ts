@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { inferStatus, getReference } from "../biomarker-references";
+import { canonicalSlug } from "../biomarker-slug";
 
 describe("inferStatus — regra principal", () => {
   it("B12=829, ref [200,900] → optimal (regressão do bug)", () => {
@@ -72,5 +73,90 @@ describe("getReference — referências estáticas canônicas", () => {
     const ref = getReference("vitamina-b12", undefined, undefined);
     expect(ref).not.toBeNull();
     expect(inferStatus(829, ref!)).toBe("optimal");
+  });
+});
+
+describe("SpO2 — sem override canônico, ref do laboratório vence", () => {
+  it("saturacao-oxigenio não tem referência canônica (labs divergem)", () => {
+    expect(getReference("saturacao-oxigenio", null, null)).toBeNull();
+  });
+
+  it("SpO2 92% com ref Sabin [80,100] → optimal (bug original era critical)", () => {
+    expect(inferStatus(92, { min: 80, max: 100 })).toBe("optimal");
+  });
+
+  it("SpO2 75% com ref Sabin [80,100] → low", () => {
+    expect(inferStatus(75, { min: 80, max: 100 })).toBe("low");
+  });
+});
+
+describe("Coagulação — novos biomarcadores", () => {
+  it("INR 1.0 dentro de [0.8,1.2] → optimal", () => {
+    expect(inferStatus(1.0, { min: 0.8, max: 1.2 })).toBe("optimal");
+  });
+
+  it("INR 1.5 acima de [0.8,1.2] → high", () => {
+    expect(inferStatus(1.5, { min: 0.8, max: 1.2 })).toBe("high");
+  });
+
+  it("INR 2.0 acima de 1.5× máximo [0.8,1.2] → critical", () => {
+    expect(inferStatus(2.0, { min: 0.8, max: 1.2 })).toBe("critical");
+  });
+
+  it("D-dímero 0.3 µg/mL dentro de [,0.5] → optimal", () => {
+    expect(inferStatus(0.3, { max: 0.5 })).toBe("optimal");
+  });
+
+  it("D-dímero 1.0 µg/mL acima de 1.5× 0.5 → critical", () => {
+    expect(inferStatus(1.0, { max: 0.5 })).toBe("critical");
+  });
+
+  it("getReference inr retorna [0.8,1.2]", () => {
+    expect(getReference("inr", null, null)).toEqual({ min: 0.8, max: 1.2 });
+  });
+
+  it("getReference d-dimero retorna max 0.5", () => {
+    expect(getReference("d-dimero", null, null)).toEqual({ max: 0.5 });
+  });
+});
+
+describe("HDL — alto é sempre optimal (sem max canônico)", () => {
+  it("HDL 80 mg/dL (acima do mínimo masculino) → optimal", () => {
+    expect(inferStatus(80, { min: 40 })).toBe("optimal");
+  });
+
+  it("HDL 120 mg/dL → optimal (sem teto, não deve ser high)", () => {
+    expect(inferStatus(120, { min: 40 })).toBe("optimal");
+  });
+});
+
+describe("canonicalSlug — desambiguação SpO2 vs. transferrina", () => {
+  it("spo2 → saturacao-oxigenio", () => {
+    expect(canonicalSlug("spo2")).toBe("saturacao-oxigenio");
+  });
+
+  it("saturacao-de-oxigenio → saturacao-oxigenio", () => {
+    expect(canonicalSlug("saturacao-de-oxigenio")).toBe("saturacao-oxigenio");
+  });
+
+  it("saturacao-de-transferrina → saturacao-transferrina (ferro)", () => {
+    expect(canonicalSlug("saturacao-de-transferrina")).toBe("saturacao-transferrina");
+  });
+
+  it("slugs SpO2 e transferrina nunca colidem", () => {
+    expect(canonicalSlug("saturacao-oxigenio")).not.toBe("saturacao-transferrina");
+    expect(canonicalSlug("saturacao-transferrina")).not.toBe("saturacao-oxigenio");
+  });
+
+  it("tp → tempo-protrombina", () => {
+    expect(canonicalSlug("tp")).toBe("tempo-protrombina");
+  });
+
+  it("cloreto → cloro", () => {
+    expect(canonicalSlug("cloreto")).toBe("cloro");
+  });
+
+  it("aptt → ttpa", () => {
+    expect(canonicalSlug("aptt")).toBe("ttpa");
   });
 });

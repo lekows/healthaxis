@@ -21,7 +21,21 @@ Use ponto como separador decimal.`;
 const PROMPT_BASE = `Extraia TODOS os resultados numéricos presentes neste exame laboratorial.
 
 Para cada parâmetro encontrado, retorne:
-- slug: identificador em minúsculas com hífens (ex: "ldl-colesterol", "hemoglobina", "tsh", "vitamina-d")
+- slug: identificador em minúsculas com hífens. Use EXATAMENTE estes slugs canônicos quando o biomarcador for reconhecido:
+  hemograma: hemoglobina, hematocrito, hemacias, leucocitos, neutrofilos, linfocitos, monocitos, eosinofilos, basofilos, plaquetas, vcm, hcm, chcm, rdw, reticulocitos
+  lipídios: colesterol-total, ldl-colesterol, hdl-colesterol, triglicerides, vldl
+  glicemia: glicose, hemoglobina-glicada, insulina
+  tireoide: tsh, t4-livre, t3-livre, anti-tpo
+  vitaminas: vitamina-d, vitamina-b12, acido-folico
+  ferro: ferritina, ferro-serico, tibc, saturacao-transferrina
+  oximetria: saturacao-oxigenio (SpO2 / oximetria de pulso / saturação periférica — NÃO confundir com saturacao-transferrina)
+  função renal: creatinina, ureia, acido-urico
+  função hepática: ast-tgo, alt-tgp, ggt, fosfatase-alcalina, bilirrubina-total, bilirrubina-direta, albumina, proteinas-totais
+  eletrólitos: sodio, potassio, calcio, magnesio, fosforo, cloro
+  coagulação: tempo-protrombina, inr, ttpa, fibrinogenio, d-dimero
+  inflamação: proteina-c-reativa, vhs
+  hormônios: cortisol, testosterona-total, estradiol, progesterona, fsh, lh, prolactina
+  Para biomarcadores não listados, crie slug descritivo em minúsculas com hífens (ex: "25-oh-vitamina-d3")
 - nome: nome completo como aparece no exame
 - valor: valor numérico do resultado (use ponto como decimal)
 - unidade: unidade de medida (ex: "mg/dL", "g/dL", "mUI/L", "%")

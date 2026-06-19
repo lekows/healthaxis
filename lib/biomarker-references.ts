@@ -61,6 +61,7 @@ const REFERENCES: Record<string, SexRanges> = {
   calcio:   { universal: { min: 8.5, max: 10.5 }, descricao: "Mineral fundamental para ossos, dentes e contração muscular. Baixo indica risco de osteoporose." },
   magnesio: { universal: { min: 1.7, max: 2.5  }, descricao: "Mineral que participa de mais de 300 reações enzimáticas. Deficiência causa câimbras, fadiga e irritabilidade." },
   fosforo:  { universal: { min: 2.5, max: 4.5  }, descricao: "Trabalha junto com o cálcio na saúde óssea e na produção de energia celular." },
+  cloro:    { universal: { min: 98,  max: 106  }, descricao: "Eletrólito que mantém o equilíbrio ácido-base e o volume de líquidos. Avaliado junto com sódio e potássio." },
 
   // ── Função Hepática ────────────────────────────────────────────────────
   "ast-tgo":            { male: { min: 10, max: 40  }, female: { min: 10, max: 32  }, descricao: "Enzima presente no fígado e músculos. Elevada indica dano hepático ou muscular." },
@@ -88,7 +89,16 @@ const REFERENCES: Record<string, SexRanges> = {
   "acido-folico": { universal: { min: 5.4 }, descricao: "Vitamina B9 — essencial para produção de células e DNA. Crítica na gravidez para prevenir malformações." },
 
   // ── Oximetria ──────────────────────────────────────────────────────────
-  "saturacao-oxigenio": { universal: { min: 95, max: 100 }, descricao: "Percentual de hemoglobina saturada com oxigênio (SpO2). Valores abaixo de 95% indicam hipóxia e devem ser avaliados com urgência." },
+  // Sem min/max canônico: labs brasileiros usam ranges distintos (Sabin: 80-100, outros: 95-100).
+  // A referência do laboratório ganha via effectiveRef = staticRef ?? labRef.
+  "saturacao-oxigenio": { descricao: "Percentual de hemoglobina saturada com oxigênio (SpO2). Avalie conforme a referência do laboratório." },
+
+  // ── Coagulação ─────────────────────────────────────────────────────────
+  "tempo-protrombina": { universal: { min: 11, max: 15   }, descricao: "Tempo de Protrombina (TP). Avalia a via extrínseca da coagulação. Prolongado indica risco de sangramento ou uso de anticoagulante." },
+  inr:                 { universal: { min: 0.8, max: 1.2 }, descricao: "Índice Normalizado Internacional. Padronização do TP; > 1.8 indica anticoagulação excessiva ou coagulopatia." },
+  ttpa:                { universal: { min: 25, max: 35   }, descricao: "Tempo de Tromboplastina Parcial Ativada. Avalia a via intrínseca. Prolongado indica deficiência de fator ou uso de heparina." },
+  fibrinogenio:        { universal: { min: 200, max: 400 }, descricao: "Proteína essencial para a formação do coágulo. Baixo indica coagulopatia de consumo; alto, risco trombótico ou inflamação." },
+  "d-dimero":          { universal: { max: 0.5           }, descricao: "Produto de degradação da fibrina. Elevado sugere trombose ativa (TEP, TVP, CIVD). Valor > 0.75 µg/mL FEU = crítico." },
 
   // ── Inflamação / Ferro ─────────────────────────────────────────────────
   "proteina-c-reativa":                    { universal: { max: 5 }, descricao: "Marcador de inflamação aguda. Elevada indica infecção ativa, inflamação ou risco cardiovascular." },
@@ -108,7 +118,7 @@ const REFERENCES: Record<string, SexRanges> = {
   lh:           { descricao: "Hormônio luteinizante, da hipófise. Controla a ovulação e a produção de testosterona; avalia fertilidade e função gonadal." },
   estradiol:    { descricao: "Principal estrogênio. Regula o ciclo menstrual e a saúde óssea; varia conforme a fase do ciclo e a menopausa." },
   progesterona: { descricao: "Hormônio que prepara o útero para a gravidez e regula o ciclo menstrual. Útil para confirmar a ovulação." },
-  prolactina:   { descricao: "Hormônio que estimula a produção de leite. Elevada fora da gravidez pode causar irregularidade menstrual e infertilidade." },
+  prolactina:   { male: { min: 2, max: 18 }, female: { min: 2, max: 29 }, descricao: "Hormônio que estimula a produção de leite. Elevada fora da gravidez pode causar irregularidade menstrual e infertilidade." },
 };
 
 export function getReference(
@@ -176,6 +186,13 @@ const KEYWORD_ALIASES: [RegExp, string][] = [
   [/ferritina/, "ferritina"],
   [/\btsh\b|tireoestimulante/, "tsh"],
   [/saturacao.*(oxigenio|o2)|\bspo2\b|oximetria/, "saturacao-oxigenio"],
+  [/protrombina|\btp\b/, "tempo-protrombina"],
+  [/\binr\b/, "inr"],
+  [/tromboplastina.*parcial|\bttpa\b|\baptt\b/, "ttpa"],
+  [/fibrinogenio|fibrinogênio/, "fibrinogenio"],
+  [/d.dimero|dimero.d/, "d-dimero"],
+  [/\bcloro\b|cloreto/, "cloro"],
+  [/prolactina/, "prolactina"],
 ];
 
 export function getBiomarkerInfo(slug?: string | null, name?: string | null): string | null {
