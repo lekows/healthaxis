@@ -29,7 +29,7 @@ const primaryNav = [
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/exams", label: "Exames", icon: FlaskConical },
   { href: "/documents", label: "Documentos", icon: FolderOpen },
-  { href: "/timeline", label: "Linha do Tempo", icon: Clock },
+  { href: "/overview", label: "Visão Geral", icon: BarChart2 },
   { href: "/profile", label: "Perfil", icon: User },
 ];
 
