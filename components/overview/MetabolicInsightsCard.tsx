@@ -73,7 +73,7 @@ function PatternCard({ p }: { p: MetabolicPattern }) {
           <span className="text-xs font-bold uppercase tracking-wider shrink-0" style={{ color: style.color }}>
             {style.label}
           </span>
-          <p className="text-sm font-semibold truncate" style={{ color: "#E8E4D9" }}>{p.name}</p>
+          <p className="text-sm font-semibold line-clamp-2" style={{ color: "#E8E4D9" }}>{p.name}</p>
         </div>
         {open
           ? <ChevronUp size={13} style={{ color: "#5A5A50", flexShrink: 0 }} />
@@ -119,7 +119,7 @@ export function MetabolicInsightsCard({ run }: Props) {
   return (
     <div className="rounded-3xl p-5 space-y-3" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Activity size={15} style={{ color: "#52B788" }} />
           <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>Padrões metabólicos</p>
           <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(82,183,136,0.1)", color: "#52B788" }}>
