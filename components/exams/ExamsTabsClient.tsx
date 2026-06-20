@@ -3,7 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FlaskConical, AlertTriangle, FolderOpen, FileText,
-  Image as ImageIcon, CheckCircle, Clock, Plus
+  Image as ImageIcon, CheckCircle, Clock, Plus, ExternalLink
 } from "lucide-react";
 import { Card, Badge } from "@/components/ui";
 import { BiomarkerTrendCard, HealthMetricCard, BiomarkerDetailModal } from "@/components/dashboard/MetricCards";
@@ -26,6 +26,7 @@ type Biomarker = {
 type DocItem = {
   id: string; title: string; type: string; lab: string;
   date: string; status: string; tags: string[] | null;
+  file_url: string | null;
 };
 
 interface Props {
@@ -243,6 +244,19 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
                           <Badge variant={doc.status === "reviewed" ? "success" : "warning"}>
                             {doc.status === "reviewed" ? "✓" : "..."}
                           </Badge>
+                          {doc.file_url && (
+                            <a
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center justify-center w-8 h-8 rounded-xl transition-opacity hover:opacity-80 shrink-0"
+                              style={{ background: "rgba(82,183,136,0.1)", color: "#52B788" }}
+                              title="Abrir arquivo"
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                          )}
                           <DeleteDocumentButton documentId={doc.id} documentTitle={doc.title} />
                         </div>
                         <div className="space-y-1 text-xs text-ink-faint mb-3">

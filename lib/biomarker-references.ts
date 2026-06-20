@@ -44,7 +44,7 @@ const REFERENCES: Record<string, SexRanges> = {
 
   // ── Lipídios ───────────────────────────────────────────────────────────
   "colesterol-total": { universal: { max: 200 }, descricao: "Soma de todo o colesterol no sangue. Deve ser analisado junto com as frações LDL e HDL." },
-  "ldl-colesterol":   { universal: { max: 130 }, descricao: "Colesterol 'ruim' — níveis altos entopem artérias e aumentam o risco de infarto e AVC." },
+  "ldl-colesterol":   { universal: { max: 100 }, descricao: "Colesterol 'ruim' — níveis altos entopem artérias e aumentam o risco de infarto e AVC." },
   "hdl-colesterol":   { male: { min: 40 }, female: { min: 50 }, descricao: "Colesterol 'bom' — protege o coração removendo gordura das artérias. Quanto maior, melhor." },
   triglicerides:      { universal: { max: 150 }, descricao: "Gordura no sangue. Valores altos aumentam risco cardíaco e indicam excesso de açúcar ou álcool na dieta." },
   triglicerideos:     { universal: { max: 150 }, descricao: "Gordura no sangue. Valores altos aumentam risco cardíaco e indicam excesso de açúcar ou álcool na dieta." },
