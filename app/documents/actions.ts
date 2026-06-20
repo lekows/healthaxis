@@ -631,12 +631,12 @@ export async function recalculateAllBiomarkerStatuses(): Promise<{ error?: strin
       const staticRef = getReference(slug, sex, ageYears);
       if (!staticRef) continue;
       const newStatus = inferStatus(Number(b.value), staticRef);
-      if (newStatus === b.status) continue;
+      const statusChanged = newStatus !== b.status;
       await supabase.from("biomarkers")
         .update({ status: newStatus, reference: staticRef })
         .eq("user_id", user.id)
         .eq("slug", b.slug);
-      updated++;
+      if (statusChanged) updated++;
     }
 
     revalidatePath("/exams");
