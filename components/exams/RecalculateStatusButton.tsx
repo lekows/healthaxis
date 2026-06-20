@@ -3,7 +3,7 @@ import { useState } from "react";
 import { recalculateAllBiomarkerStatuses } from "@/app/documents/actions";
 import { RefreshCw } from "lucide-react";
 
-export function RecalculateStatusButton() {
+export function RecalculateStatusButton({ compact = false }: { compact?: boolean }) {
   const [state, setState] = useState<"idle" | "loading" | "done">("idle");
 
   async function handleClick() {
@@ -25,7 +25,9 @@ export function RecalculateStatusButton() {
       }}
     >
       <RefreshCw size={14} className={state === "loading" ? "animate-spin" : ""} />
-      {state === "done" ? "Atualizado!" : state === "loading" ? "Atualizando..." : "Atualizar status"}
+      {compact
+        ? (state === "done" ? "✓" : state === "loading" ? "…" : "Status")
+        : (state === "done" ? "Atualizado!" : state === "loading" ? "Atualizando..." : "Atualizar status")}
     </button>
   );
 }

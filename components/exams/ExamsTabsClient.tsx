@@ -279,6 +279,13 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
         </motion.button>
       </div>
 
+      {/* Mobile: botão recalcular status — acima do FAB principal */}
+      {tab === "resultados" && (
+        <div className="lg:hidden fixed bottom-36 right-4 z-20">
+          <RecalculateStatusButton compact />
+        </div>
+      )}
+
       {uploadOpen && (
         <DocumentUploadModalInner onClose={() => setUploadOpen(false)} userName={userName ?? undefined} />
       )}
