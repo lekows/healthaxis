@@ -51,11 +51,11 @@ export function MetabolicAnalysisSection({ initialRun }: Props) {
             <button
               onClick={handleAnalyze}
               disabled={loading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition-opacity hover:opacity-70 disabled:opacity-40"
-              style={{ color: "#5A5A50" }}
+              className="flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
+              style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.25)" }}
             >
-              {loading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-              Reanalisar
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {loading ? "Reanalisando..." : "Reanalisar"}
             </button>
           </div>
         </>

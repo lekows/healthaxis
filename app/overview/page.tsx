@@ -34,7 +34,7 @@ export default async function HealthOverviewPage() {
 
   return (
     <DashboardLayout userName={profile?.name} isDoctor={isDoctor}>
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8 pb-28 lg:pb-8">
 
         <div>
           <h1 className="text-2xl font-bold" style={{ color: "#E8E4D9" }}>Visão Geral de Saúde</h1>
