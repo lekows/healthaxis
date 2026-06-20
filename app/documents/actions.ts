@@ -140,7 +140,28 @@ export async function saveExamBiomarkers(
 
     // Normalize OCR-produced slugs to canonical forms before all comparisons.
     // Existing history may also have non-canonical slugs from previous uploads.
-    const normalizedEntries = entries.map((e) => ({ ...e, slug: canonicalSlug(e.slug) }));
+    // Deduplicate by canonical slug: Brazilian labs often print both aliases (e.g. "AST" and
+    // "TGO" as separate rows). After canonicalization both map to "ast-tgo", which would cause
+    // the biomarkers upsert to fail with "ON CONFLICT DO UPDATE command cannot affect row a
+    // second time". Keep the first occurrence and merge historico arrays.
+    const normalizedEntries = (() => {
+      const mapped = entries.map((e) => ({ ...e, slug: canonicalSlug(e.slug) }));
+      const seen = new Map<string, typeof mapped[0]>();
+      for (const e of mapped) {
+        if (seen.has(e.slug)) {
+          const prev = seen.get(e.slug)!;
+          const prevDates = new Set((prev.historico ?? []).map((h) => h.data));
+          const merged = [
+            ...(prev.historico ?? []),
+            ...(e.historico ?? []).filter((h) => !prevDates.has(h.data)),
+          ];
+          seen.set(e.slug, { ...prev, historico: merged });
+        } else {
+          seen.set(e.slug, e);
+        }
+      }
+      return Array.from(seen.values());
+    })();
 
     const priorValue = (slug: string, embedded: { data: string; valor: number }[]): number | null => {
       const candidates = [
