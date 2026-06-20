@@ -89,9 +89,10 @@ const REFERENCES: Record<string, SexRanges> = {
   "acido-folico": { universal: { min: 5.4 }, descricao: "Vitamina B9 — essencial para produção de células e DNA. Crítica na gravidez para prevenir malformações." },
 
   // ── Oximetria ──────────────────────────────────────────────────────────
-  // Sem min/max canônico: labs brasileiros usam ranges distintos (Sabin: 80-100, outros: 95-100).
-  // A referência do laboratório ganha via effectiveRef = staticRef ?? labRef.
-  "saturacao-oxigenio": { descricao: "Percentual de hemoglobina saturada com oxigênio (SpO2). Avalie conforme a referência do laboratório." },
+  // min: 95 é o limiar clínico universal para adultos em repouso.
+  // Sabin imprime "80-100" como faixa técnica do equipamento (não clínica) — OCR captura errado.
+  // Referência estática evita que a ref do lab sobrescreva o valor correto.
+  "saturacao-oxigenio": { universal: { min: 95 }, descricao: "Percentual de hemoglobina saturada com oxigênio (SpO2). Valores abaixo de 95% indicam hipoxemia leve." },
 
   // ── Coagulação ─────────────────────────────────────────────────────────
   "tempo-protrombina": { universal: { min: 11, max: 15   }, descricao: "Tempo de Protrombina (TP). Avalia a via extrínseca da coagulação. Prolongado indica risco de sangramento ou uso de anticoagulante." },

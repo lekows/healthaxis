@@ -633,7 +633,7 @@ export async function recalculateAllBiomarkerStatuses(): Promise<{ error?: strin
       const newStatus = inferStatus(Number(b.value), staticRef);
       if (newStatus === b.status) continue;
       await supabase.from("biomarkers")
-        .update({ status: newStatus })
+        .update({ status: newStatus, reference: staticRef })
         .eq("user_id", user.id)
         .eq("slug", b.slug);
       updated++;
