@@ -243,3 +243,20 @@ export async function getMySharedTokens(): Promise<SharedExamToken[]> {
     .order("created_at", { ascending: false });
   return data ?? [];
 }
+
+export async function logDoctorAccess(
+  doctorId: string,
+  patientId: string,
+  accessType: "panel_view" | "link_created" | "link_revoked"
+): Promise<void> {
+  const { createClient: createAdminClient } = await import("@supabase/supabase-js");
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  await admin.from("doctor_access_logs").insert({
+    doctor_id: doctorId,
+    patient_id: patientId,
+    access_type: accessType,
+  });
+}

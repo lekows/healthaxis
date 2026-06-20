@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logDoctorAccess } from "@/lib/supabase/doctor-queries";
 
 export async function POST(req: Request) {
   const { token } = await req.json();
@@ -48,5 +49,6 @@ export async function POST(req: Request) {
       .eq("id", inviteRecord.id);
   }
 
+  void logDoctorAccess(doctorId, user.id, "link_created");
   return NextResponse.json({ ok: true, doctor_id: doctorId });
 }

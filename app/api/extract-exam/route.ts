@@ -289,7 +289,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ...examData,
         identificador_externo: examData.identificador_externo ?? extractKnownExternalIdentifier(pastedText),
-        _debug_raw: responseText.substring(0, 4000),
+        ...(process.env.NODE_ENV === "development" && { _debug_raw: responseText.substring(0, 4000) }),
       });
     }
 
@@ -299,6 +299,20 @@ export async function POST(req: NextRequest) {
     let imageMediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/jpeg";
 
     if (fileUrl) {
+      const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+        : null;
+      let parsedFileUrl: URL;
+      try {
+        parsedFileUrl = new URL(fileUrl);
+      } catch {
+        await finalizeExtraction(false, "URL de arquivo inválida.");
+        return NextResponse.json({ resultados: [], ocr_error: "URL de arquivo inválida." });
+      }
+      if (!supabaseHost || parsedFileUrl.hostname !== supabaseHost) {
+        await finalizeExtraction(false, "Origem do arquivo não permitida.");
+        return NextResponse.json({ resultados: [], ocr_error: "Origem do arquivo não permitida." });
+      }
       const ctrl = new AbortController();
       const storageTimeout = setTimeout(() => ctrl.abort(), 20000);
       let resp: Response;
@@ -313,6 +327,11 @@ export async function POST(req: NextRequest) {
       if (!resp.ok) {
         await finalizeExtraction(false, "Não foi possível baixar o arquivo.");
         return NextResponse.json({ resultados: [], ocr_error: "Não foi possível baixar o arquivo enviado." });
+      }
+      const contentLength = Number(resp.headers.get("content-length") ?? 0);
+      if (contentLength > 8 * 1024 * 1024) {
+        await finalizeExtraction(false, "Arquivo muito grande.");
+        return NextResponse.json({ resultados: [], ocr_error: "Arquivo muito grande (máx 8 MB)." });
       }
       buffer = Buffer.from(await resp.arrayBuffer());
       isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
@@ -403,7 +422,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...examData,
       identificador_externo: deterministicIdentifier ?? examData.identificador_externo,
-      _debug_raw: responseText.substring(0, 4000),
+      ...(process.env.NODE_ENV === "development" && { _debug_raw: responseText.substring(0, 4000) }),
     });
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);

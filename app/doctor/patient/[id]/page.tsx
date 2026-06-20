@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
-import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers, getPatientLatestMetabolicAnalysis } from "@/lib/supabase/doctor-queries";
+import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers, getPatientLatestMetabolicAnalysis, logDoctorAccess } from "@/lib/supabase/doctor-queries";
 import { WatchedBiomarkerToggle } from "@/components/doctor/WatchedBiomarkerToggle";
 import { ConsultationPrepClient } from "@/components/doctor/ConsultationPrepClient";
 import { MetabolicInsightsCard } from "@/components/overview/MetabolicInsightsCard";
@@ -44,6 +44,8 @@ export default async function DoctorPatientPage({ params }: Props) {
   if (!doctorProfile) redirect("/doctor/setup");
   // Sem vínculo ativo → não autorizado.
   if (!panel) notFound();
+
+  void logDoctorAccess(doctorProfile.id, id, "panel_view");
 
   const sorted = [...panel.biomarkers].sort(
     (a, b) => (STATUS_SEVERITY[b.status] ?? 0) - (STATUS_SEVERITY[a.status] ?? 0)
