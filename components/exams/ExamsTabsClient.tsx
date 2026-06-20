@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, CheckCircle, Clock, Plus
 } from "lucide-react";
 import { Card, Badge } from "@/components/ui";
-import { BiomarkerTrendCard, HealthMetricCard } from "@/components/dashboard/MetricCards";
+import { BiomarkerTrendCard, HealthMetricCard, BiomarkerDetailModal } from "@/components/dashboard/MetricCards";
 import { ManualBiomarkerModal } from "@/components/exams/ManualBiomarkerModal";
 import { RecalculateStatusButton } from "@/components/exams/RecalculateStatusButton";
 import { DocumentUploadModalInner } from "@/components/documents/DocumentUploadModal";
@@ -52,6 +52,7 @@ const TABS: { id: Tab; label: string }[] = [
 export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documents, userName }: Props) {
   const [tab, setTab] = useState<Tab>("resultados");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [detailBiomarker, setDetailBiomarker] = useState<Biomarker | null>(null);
 
   const anomalies = biomarkers.filter(b => ["attention", "high", "low", "critical"].includes(b.status));
   const reviewed = documents.filter(d => d.status === "reviewed").length;
@@ -129,7 +130,8 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {anomalies.map(b => (
-                      <div key={b.id} className="flex items-center gap-2 px-3 py-2 rounded-2xl"
+                      <div key={b.id} onClick={() => setDetailBiomarker(b)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-2xl cursor-pointer transition-opacity hover:opacity-75"
                         style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
                         <span className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{b.name}</span>
                         <span className="text-sm font-bold" style={{ color: b.status === "critical" || b.status === "high" ? "#C1440E" : "#F4A261" }}>
@@ -142,6 +144,19 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
                     ))}
                   </div>
                 </div>
+              )}
+
+              {detailBiomarker && (
+                <BiomarkerDetailModal
+                  name={detailBiomarker.name}
+                  value={Number(detailBiomarker.value)}
+                  unit={detailBiomarker.unit}
+                  status={detailBiomarker.status}
+                  history={historyBySlug[detailBiomarker.slug] ?? []}
+                  reference={detailBiomarker.reference ?? undefined}
+                  slug={detailBiomarker.slug}
+                  onClose={() => setDetailBiomarker(null)}
+                />
               )}
 
               {biomarkers.length === 0 ? (

@@ -92,7 +92,7 @@ interface DetailModalProps {
   slug?: string; onClose: () => void;
 }
 
-function BiomarkerDetailModal({ name, value, unit, status, history, reference, slug, onClose }: DetailModalProps) {
+export function BiomarkerDetailModal({ name, value, unit, status, history, reference, slug, onClose }: DetailModalProps) {
   const [period, setPeriod] = useState<Period>("all");
   const color = getBiomarkerColor(status);
   const info = getBiomarkerInfo(slug, name) ?? undefined;
