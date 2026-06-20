@@ -263,7 +263,9 @@ export async function saveExamBiomarkers(
       }));
 
     if (toInsert.length > 0) {
-      const { error: histErr } = await supabase.from("biomarker_history").insert(toInsert);
+      const { error: histErr } = await supabase
+        .from("biomarker_history")
+        .upsert(toInsert, { onConflict: "user_id,biomarker_slug,recorded_at", ignoreDuplicates: true });
       if (histErr) return { error: histErr.message };
     }
 
