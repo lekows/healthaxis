@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, ChevronDown, ChevronUp } from "lucide-react";
+import { Activity, ChevronDown, ChevronUp, Loader2, RefreshCw } from "lucide-react";
 
 type PatternType = "protective" | "concern" | "mixed";
 
@@ -27,6 +27,8 @@ interface Props {
     confidence_score: number | null;
     completed_at: string | null;
   };
+  onReanalisar?: () => void;
+  loadingReanalisar?: boolean;
 }
 
 function parseOutput(raw: unknown): MetabolicOutput | null {
@@ -105,7 +107,7 @@ function severityOrder(p: MetabolicPattern): number {
   return 2;
 }
 
-export function MetabolicInsightsCard({ run }: Props) {
+export function MetabolicInsightsCard({ run, onReanalisar, loadingReanalisar }: Props) {
   const output = parseOutput(run.output_json);
   if (!output) return null;
   if (output.patterns.length === 0 && !output.notes) return null;
@@ -126,7 +128,20 @@ export function MetabolicInsightsCard({ run }: Props) {
             {confidence}% confiança
           </span>
         </div>
-        {runDate && <p className="text-xs" style={{ color: "#5A5A50" }}>{runDate}</p>}
+        <div className="flex items-center gap-2">
+          {onReanalisar && (
+            <button
+              onClick={onReanalisar}
+              disabled={loadingReanalisar}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
+              style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.25)" }}
+            >
+              {loadingReanalisar ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              {loadingReanalisar ? "Reanalisando..." : "Reanalisar"}
+            </button>
+          )}
+          {runDate && <p className="text-xs" style={{ color: "#5A5A50" }}>{runDate}</p>}
+        </div>
       </div>
 
       {output.patterns.length === 0 ? (

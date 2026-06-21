@@ -12,8 +12,8 @@ interface SexRanges {
 
 const REFERENCES: Record<string, SexRanges> = {
   // ── Hemograma ──────────────────────────────────────────────────────────
-  hemoglobina:        { male: { min: 13.5, max: 17.5 }, female: { min: 12.0, max: 16.0 }, descricao: "Proteína que carrega oxigênio nos glóbulos vermelhos. Valores baixos causam cansaço e indicam anemia." },
-  hematocrito:        { male: { min: 41,   max: 53   }, female: { min: 36,   max: 46   }, descricao: "Percentual do sangue ocupado por glóbulos vermelhos. Reflete a capacidade de transporte de oxigênio." },
+  hemoglobina:        { male: { min: 13.0, max: 17.5 }, female: { min: 12.0, max: 16.0 }, descricao: "Proteína que carrega oxigênio nos glóbulos vermelhos. Valores baixos causam cansaço e indicam anemia." },
+  hematocrito:        { male: { min: 38.5, max: 53   }, female: { min: 36,   max: 46   }, descricao: "Percentual do sangue ocupado por glóbulos vermelhos. Reflete a capacidade de transporte de oxigênio." },
   hemacias:           { male: { min: 4.5,  max: 6.0  }, female: { min: 4.0,  max: 5.4  }, descricao: "Contagem de glóbulos vermelhos. Baixa indica anemia; alta pode ocorrer em desidratação ou doenças pulmonares." },
   eritrocitos:        { male: { min: 4.5,  max: 6.0  }, female: { min: 4.0,  max: 5.4  }, descricao: "Contagem de glóbulos vermelhos. Baixa indica anemia; alta pode ocorrer em desidratação ou doenças pulmonares." },
   vcm:                { universal: { min: 80,  max: 100  }, descricao: "Tamanho médio dos glóbulos vermelhos. Ajuda a identificar o tipo de anemia." },
@@ -73,7 +73,8 @@ const REFERENCES: Record<string, SexRanges> = {
   ggt:                  { male: { min: 7,  max: 73  }, female: { min: 7,  max: 38  }, descricao: "Enzima hepática sensível ao álcool e a medicamentos. Elevada indica sobrecarga hepática." },
   "fosfatase-alcalina": { male: { min: 40, max: 130 }, female: { min: 35, max: 105 }, descricao: "Enzima presente no fígado e nos ossos. Elevada pode indicar doença hepática ou óssea." },
   "bilirrubina-total":  { universal: { min: 0.2, max: 1.2 }, descricao: "Pigmento formado pela degradação dos glóbulos vermelhos. Elevada causa icterícia (pele amarelada)." },
-  "bilirrubina-direta": { universal: { max: 0.4 }, descricao: "Fração da bilirrubina já processada pelo fígado. Elevada indica obstrução das vias biliares." },
+  "bilirrubina-direta": { universal: { max: 0.3 }, descricao: "Fração da bilirrubina já processada pelo fígado. Elevada indica obstrução das vias biliares." },
+  "bilirrubina-indireta": { universal: { max: 0.9 }, descricao: "Bilirrubina não processada pelo fígado. Elevada indica destruição excessiva de glóbulos vermelhos (hemólise) ou síndrome de Gilbert." },
   albumina:             { universal: { min: 3.5, max: 5.0 }, descricao: "Principal proteína do sangue, produzida pelo fígado. Baixa indica desnutrição ou doença hepática." },
   "proteinas-totais":   { universal: { min: 6.0, max: 8.3 }, descricao: "Soma das proteínas no sangue. Reflete o estado nutricional e a função hepática." },
 
@@ -111,6 +112,30 @@ const REFERENCES: Record<string, SexRanges> = {
   "ferro-serico":           { male: { min: 70, max: 180 }, female: { min: 60, max: 160 }, descricao: "Ferro em circulação no sangue. Baixo causa anemia; deve ser interpretado junto com ferritina e TIBC." },
   tibc:                     { universal: { min: 240, max: 450 }, descricao: "Capacidade total de ligação do ferro. Elevada indica deficiência de ferro; baixa, sobrecarga ou inflamação." },
   "saturacao-transferrina": { universal: { min: 20,  max: 50  }, descricao: "Percentual da transferrina ocupado por ferro. Baixo confirma deficiência; alto indica sobrecarga." },
+
+  // ── Cardíaco ───────────────────────────────────────────────────────────
+  "troponina-t-ultrassensivel": { universal: { max: 0.014 }, descricao: "Proteína do músculo cardíaco liberada quando o coração sofre lesão. Elevada confirma infarto agudo — valor muito alto indica lesão em curso; em queda indica recuperação." },
+  "troponina-t":  { universal: { max: 0.014 }, descricao: "Proteína cardíaca liberada na lesão do miocárdio. Elevada indica infarto ou lesão cardíaca aguda." },
+  "troponina-i":  { universal: { max: 0.04  }, descricao: "Proteína cardíaca de alta especificidade para lesão do músculo do coração." },
+  cpk:            { male: { max: 190 }, female: { max: 167 }, descricao: "Creatina Quinase — enzima muscular (coração e músculos esqueléticos). Elevada indica infarto, lesão muscular ou esforço físico intenso." },
+  "cpk-mb":       { universal: { max: 25 }, descricao: "Fração cardíaca da CPK. Mais específica para infarto do miocárdio que a CPK total." },
+  dhl:            { universal: { min: 125, max: 243 }, descricao: "Desidrogenase Lática — enzima presente em vários tecidos. Elevada indica destruição celular: infarto, anemia hemolítica, lesão hepática ou tumores." },
+  ldh:            { universal: { min: 125, max: 243 }, descricao: "Desidrogenase Lática — enzima presente em vários tecidos. Elevada indica destruição celular: infarto, anemia hemolítica, lesão hepática ou tumores." },
+  "pro-bnp":      { universal: { max: 125 }, descricao: "Peptídeo liberado pelo coração quando sobrecarregado. Elevado indica insuficiência cardíaca ou sobrecarga de pressão e volume." },
+
+  // ── Pâncreas ───────────────────────────────────────────────────────────
+  lipase:         { universal: { max: 60  }, descricao: "Enzima digestiva produzida pelo pâncreas. Muito elevada indica pancreatite aguda." },
+  amilase:        { universal: { max: 100 }, descricao: "Enzima do pâncreas e glândulas salivares. Elevada em pancreatite ou obstrução dos ductos pancreáticos." },
+
+  // ── Infecção / Sepse ───────────────────────────────────────────────────
+  procalcitonina: { universal: { max: 0.5 }, descricao: "Marcador de infecção bacteriana grave e sepse. Valores > 0,5 ng/mL sugerem infecção bacteriana sistêmica; > 2 ng/mL indicam alta probabilidade de sepse." },
+
+  // ── Metabólico ─────────────────────────────────────────────────────────
+  lactato:        { universal: { min: 0.5, max: 2.2 }, descricao: "Produto do metabolismo celular sem oxigênio. Elevado indica que os tecidos não recebem oxigênio suficiente — sinal de sepse ou choque." },
+  "acido-latico": { universal: { min: 0.5, max: 2.2 }, descricao: "Produto do metabolismo celular sem oxigênio. Elevado indica que os tecidos não recebem oxigênio suficiente — sinal de sepse ou choque." },
+  "calcio-ionico":{ universal: { min: 1.12, max: 1.32 }, descricao: "Cálcio livre no sangue — a fração biologicamente ativa. Controla contração muscular, transmissão nervosa e coagulação." },
+  bicarbonato:    { universal: { min: 22, max: 26 }, descricao: "Principal tampão do sangue. Elevado indica acúmulo de base (alcalose metabólica); baixo, acúmulo de ácido (acidose metabólica)." },
+  hco3:           { universal: { min: 22, max: 26 }, descricao: "Bicarbonato — principal tampão do sangue. Elevado indica alcalose metabólica; baixo, acidose metabólica." },
 
   // ── Hormônios ──────────────────────────────────────────────────────────
   cortisol:             { universal: { min: 5, max: 25 }, descricao: "Hormônio do estresse produzido pelas adrenais. Regula energia, imunidade e resposta ao estresse." },
@@ -194,6 +219,17 @@ const KEYWORD_ALIASES: [RegExp, string][] = [
   [/d.dimero|dimero.d/, "d-dimero"],
   [/\bcloro\b|cloreto/, "cloro"],
   [/prolactina/, "prolactina"],
+  [/troponina/, "troponina-t-ultrassensivel"],
+  [/\bcpk\b|creatina.?quinase|\bck.?mb\b/, "cpk"],
+  [/\bdhl\b|\bldh\b|desidrogenase.?latica/, "dhl"],
+  [/procalcitonin/, "procalcitonina"],
+  [/\blipase\b/, "lipase"],
+  [/\bamilase\b/, "amilase"],
+  [/lactato|acido.?latico/, "lactato"],
+  [/calcio.?ionico|calcio.?livre/, "calcio-ionico"],
+  [/bilirrubina.?indireta/, "bilirrubina-indireta"],
+  [/\bhco3\b|bicarbonato/, "bicarbonato"],
+  [/pro.?bnp|\bbnp\b/, "pro-bnp"],
 ];
 
 export function getBiomarkerInfo(slug?: string | null, name?: string | null): string | null {

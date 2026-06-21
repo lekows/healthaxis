@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Loader2, RefreshCw } from "lucide-react";
+import { Activity, Loader2 } from "lucide-react";
 import { MetabolicInsightsCard } from "./MetabolicInsightsCard";
 
 type Run = {
@@ -46,18 +46,12 @@ export function MetabolicAnalysisSection({ initialRun }: Props) {
     <div className="space-y-3">
       {initialRun ? (
         <>
-          <MetabolicInsightsCard run={initialRun} />
-          <div className="flex items-center justify-end">
-            <button
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
-              style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.25)" }}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {loading ? "Reanalisando..." : "Reanalisar"}
-            </button>
-          </div>
+          <MetabolicInsightsCard
+            run={initialRun}
+            onReanalisar={handleAnalyze}
+            loadingReanalisar={loading}
+          />
+          {error && <p className="text-xs" style={{ color: "#C1440E" }}>{error}</p>}
         </>
       ) : (
         <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
