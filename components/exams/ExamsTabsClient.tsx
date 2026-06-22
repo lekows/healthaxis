@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FlaskConical, AlertTriangle, FolderOpen, FileText,
   Image as ImageIcon, CheckCircle, Clock, Plus, X,
-  ExternalLink, Eye
+  ExternalLink, Eye, CalendarDays, MapPin
 } from "lucide-react";
 import { Card, Badge } from "@/components/ui";
 import { BiomarkerTrendCard, HealthMetricCard, BiomarkerDetailModal } from "@/components/dashboard/MetricCards";
@@ -76,7 +76,7 @@ function DocumentPreviewModal({ document, onClose }: { document: DocItem; onClos
     <>
       <motion.div
         className="fixed inset-0 z-40"
-        style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)" }}
+        style={{ background: "rgba(0,0,0,0.76)", backdropFilter: "blur(8px)" }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -84,21 +84,21 @@ function DocumentPreviewModal({ document, onClose }: { document: DocItem; onClos
       />
 
       <motion.div
-        className="fixed inset-x-3 bottom-3 top-10 lg:inset-8 z-50 overflow-hidden rounded-3xl flex flex-col"
-        style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.08)" }}
+        className="fixed inset-x-3 bottom-3 top-8 lg:inset-8 z-50 overflow-hidden rounded-3xl flex flex-col"
+        style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.12)" }}
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.98 }}
         transition={{ type: "spring", stiffness: 280, damping: 28 }}
       >
-        <div className="flex items-start justify-between gap-3 p-4 lg:p-5 border-b border-border-soft">
+        <div className="flex items-start justify-between gap-3 p-4 lg:p-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="flex items-start gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-forest-pale flex items-center justify-center shrink-0">
-              <Icon size={16} className="text-forest" />
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "rgba(82,183,136,0.18)" }}>
+              <Icon size={20} style={{ color: "#52B788" }} />
             </div>
             <div className="min-w-0">
-              <p className="text-sm lg:text-base font-semibold text-ink leading-tight truncate">{document.title}</p>
-              <p className="text-xs text-ink-faint mt-1">
+              <p className="text-base lg:text-lg font-semibold leading-tight" style={{ color: "#F4F0E6" }}>{document.title}</p>
+              <p className="text-xs mt-1 leading-relaxed" style={{ color: "#B8B2A3" }}>
                 {document.type} · {document.lab || "Laboratório não informado"} · {formatDocumentDate(document.date)}
               </p>
             </div>
@@ -110,30 +110,30 @@ function DocumentPreviewModal({ document, onClose }: { document: DocItem; onClos
                 href={fileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-medium transition-opacity hover:opacity-80"
-                style={{ color: "#52B788", background: "rgba(82,183,136,0.12)", border: "1px solid rgba(82,183,136,0.25)" }}
+                className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-semibold transition-opacity hover:opacity-80"
+                style={{ color: "#0D0D0B", background: "#52B788" }}
               >
                 <ExternalLink size={14} /> Abrir fora
               </a>
             )}
             <button
               onClick={onClose}
-              className="p-2 rounded-2xl transition-opacity hover:opacity-70"
-              style={{ color: "#9A9688", background: "rgba(255,255,255,0.05)" }}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center transition-opacity hover:opacity-70"
+              style={{ color: "#E8E4D9", background: "rgba(255,255,255,0.08)" }}
               aria-label="Fechar visualização do arquivo"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 bg-canvas-subtle">
+        <div className="flex-1 min-h-0" style={{ background: "#0D0D0B" }}>
           {!fileUrl ? (
             <div className="h-full flex items-center justify-center p-8 text-center">
               <div>
-                <FileText size={36} className="mx-auto mb-3 text-ink-faint" />
-                <p className="text-sm font-semibold text-ink">Arquivo indisponível</p>
-                <p className="text-xs text-ink-faint mt-1 max-w-sm">
+                <FileText size={40} className="mx-auto mb-3" style={{ color: "#9A9688" }} />
+                <p className="text-base font-semibold" style={{ color: "#F4F0E6" }}>Arquivo indisponível</p>
+                <p className="text-sm mt-2 max-w-sm" style={{ color: "#B8B2A3" }}>
                   Este registro existe na base, mas não possui URL de arquivo salva para pré-visualização.
                 </p>
               </div>
@@ -155,19 +155,19 @@ function DocumentPreviewModal({ document, onClose }: { document: DocItem; onClos
           ) : (
             <div className="h-full flex items-center justify-center p-8 text-center">
               <div>
-                <FileText size={36} className="mx-auto mb-3 text-ink-faint" />
-                <p className="text-sm font-semibold text-ink">Pré-visualização não disponível</p>
-                <p className="text-xs text-ink-faint mt-1 max-w-sm">
+                <FileText size={40} className="mx-auto mb-3" style={{ color: "#9A9688" }} />
+                <p className="text-base font-semibold" style={{ color: "#F4F0E6" }}>Pré-visualização não disponível</p>
+                <p className="text-sm mt-2 max-w-sm" style={{ color: "#B8B2A3" }}>
                   Este formato pode não abrir dentro do navegador. Use o botão abaixo para abrir o arquivo em uma nova aba.
                 </p>
                 <a
                   href={fileUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-semibold mt-4"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold mt-5"
                   style={{ background: "#52B788", color: "#0D0D0B" }}
                 >
-                  <ExternalLink size={14} /> Abrir arquivo
+                  <ExternalLink size={16} /> Abrir arquivo
                 </a>
               </div>
             </div>
@@ -335,16 +335,16 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
 
           {tab === "arquivos" && (
             <>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-3 lg:gap-4">
                 {[
                   { label: "Total", value: documents.length, icon: FolderOpen, color: "#E8E4D9" },
                   { label: "Revisados", value: reviewed, icon: CheckCircle, color: "#52B788" },
                   { label: "Pendentes", value: documents.length - reviewed, icon: Clock, color: "#F4A261" },
                 ].map(({ label, value, icon: Icon, color }) => (
-                  <Card key={label} className="p-5 text-center">
-                    <Icon size={18} style={{ color }} className="mx-auto mb-2" />
-                    <p className="text-2xl font-bold text-ink">{value}</p>
-                    <p className="text-xs text-ink-faint mt-0.5">{label}</p>
+                  <Card key={label} className="p-4 lg:p-5 text-center" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <Icon size={20} style={{ color }} className="mx-auto mb-2" />
+                    <p className="text-2xl font-bold" style={{ color: "#F4F0E6" }}>{value}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#B8B2A3" }}>{label}</p>
                   </Card>
                 ))}
               </div>
@@ -370,40 +370,61 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") setPreviewDocument(doc);
                         }}
-                        className="p-5 cursor-pointer hover:shadow-card-hover transition-shadow"
+                        className="p-5 cursor-pointer transition-all active:scale-[0.99]"
+                        style={{
+                          background: "#141412",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          boxShadow: "0 18px 48px rgba(0,0,0,0.28)",
+                        }}
                         title={hasPreview ? "Abrir visualização do arquivo" : "Abrir detalhes do arquivo"}
                       >
-                        <div className="flex items-start gap-3 mb-4">
-                          <div className="w-10 h-10 rounded-xl bg-forest-pale flex items-center justify-center shrink-0">
-                            <Icon size={16} className="text-forest" />
+                        <div className="flex items-start gap-4">
+                          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "rgba(82,183,136,0.18)" }}>
+                            <Icon size={22} style={{ color: "#52B788" }} />
                           </div>
+
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-ink leading-tight">{doc.title}</p>
-                            <p className="text-xs text-ink-faint mt-0.5">{doc.type}</p>
+                            <p className="text-base font-semibold leading-snug" style={{ color: "#F4F0E6" }}>{doc.title}</p>
+                            <p className="text-sm mt-1" style={{ color: "#D8D2C4" }}>{doc.type}</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {hasPreview && <Eye size={14} className="text-forest" />}
-                            <Badge variant={doc.status === "reviewed" ? "success" : "warning"}>
-                              {doc.status === "reviewed" ? "✓" : "..."}
-                            </Badge>
-                            <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+
+                          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                            <div className="hidden sm:flex items-center px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: doc.status === "reviewed" ? "rgba(82,183,136,0.14)" : "rgba(244,162,97,0.14)", color: doc.status === "reviewed" ? "#52B788" : "#F4A261", border: `1px solid ${doc.status === "reviewed" ? "rgba(82,183,136,0.25)" : "rgba(244,162,97,0.25)"}` }}>
+                              {doc.status === "reviewed" ? "Revisado" : "Pendente"}
+                            </div>
+                            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.06)" }}>
                               <DeleteDocumentButton documentId={doc.id} documentTitle={doc.title} />
                             </div>
                           </div>
                         </div>
-                        <div className="space-y-1 text-xs text-ink-faint mb-3">
-                          <p>📍 {doc.lab || "Laboratório não informado"}</p>
-                          <p>📅 {formatDocumentDate(doc.date)}</p>
+
+                        <div className="mt-5 space-y-2 text-sm">
+                          <div className="flex items-center gap-2" style={{ color: "#D8D2C4" }}>
+                            <MapPin size={15} style={{ color: "#C1440E" }} />
+                            <span>{doc.lab || "Laboratório não informado"}</span>
+                          </div>
+                          <div className="flex items-center gap-2" style={{ color: "#D8D2C4" }}>
+                            <CalendarDays size={15} style={{ color: "#F4A261" }} />
+                            <span>{formatDocumentDate(doc.date)}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex gap-1 flex-wrap">
+
+                        {(doc.tags ?? []).length > 0 && (
+                          <div className="flex gap-2 flex-wrap mt-4">
                             {(doc.tags ?? []).map((t: string) => (
-                              <span key={t} className="px-2 py-0.5 rounded-full bg-canvas-subtle text-ink-faint border border-border-soft text-xs">{t}</span>
+                              <span key={t} className="px-3 py-1 rounded-full text-xs font-medium" style={{ background: "rgba(255,255,255,0.08)", color: "#E8E4D9", border: "1px solid rgba(255,255,255,0.08)" }}>{t}</span>
                             ))}
                           </div>
-                          <span className="text-xs font-medium text-forest shrink-0">
-                            {hasPreview ? "Visualizar" : "Sem arquivo"}
-                          </span>
+                        )}
+
+                        <div className="mt-5 flex items-center justify-between gap-3">
+                          <div className="sm:hidden px-3 py-1.5 rounded-full text-xs font-semibold" style={{ background: doc.status === "reviewed" ? "rgba(82,183,136,0.14)" : "rgba(244,162,97,0.14)", color: doc.status === "reviewed" ? "#52B788" : "#F4A261", border: `1px solid ${doc.status === "reviewed" ? "rgba(82,183,136,0.25)" : "rgba(244,162,97,0.25)"}` }}>
+                            {doc.status === "reviewed" ? "Revisado" : "Pendente"}
+                          </div>
+                          <div className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-bold" style={{ background: hasPreview ? "#52B788" : "rgba(255,255,255,0.08)", color: hasPreview ? "#0D0D0B" : "#9A9688", minHeight: 48 }}>
+                            {hasPreview ? <Eye size={17} /> : <FileText size={17} />}
+                            {hasPreview ? "Visualizar exame" : "Arquivo indisponível"}
+                          </div>
                         </div>
                       </Card>
                     );
