@@ -19,11 +19,13 @@ export default async function DoctorAdminPage({
     getClinicalAdminProfile(),
   ]);
 
-  if (!clinicalAdmin) redirect("/doctor");
+  // Não-admin vai direto para o dashboard do paciente, sem entrar na cadeia
+  // /doctor → /doctor/setup (evita "flap" de redirecionamentos).
+  if (!clinicalAdmin) redirect("/dashboard");
 
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.q?.trim() || undefined;
-  const patients = await getAllPatientsForClinicalAdmin({ search: query, limit: 100 });
+  const patients = await getAllPatientsForClinicalAdmin({ search: query, limit: 100, admin: clinicalAdmin });
 
   return (
     <DashboardLayout userName={profile?.name} isDoctor>
