@@ -88,11 +88,17 @@ const REFERENCES: Record<string, SexRanges> = {
   "vitamina-b12": { universal: { min: 200, max: 900 }, descricao: "Essencial para neurônios e glóbulos vermelhos. Deficiência causa fadiga e formigamentos." },
   "acido-folico": { universal: { min: 5.4 }, descricao: "Vitamina B9 — essencial para produção de células e DNA. Crítica na gravidez para prevenir malformações." },
 
-  // ── Oximetria ──────────────────────────────────────────────────────────
-  // min: 95 é o limiar clínico universal para adultos em repouso.
-  // Sabin imprime "80-100" como faixa técnica do equipamento (não clínica) — OCR captura errado.
-  // Referência estática evita que a ref do lab sobrescreva o valor correto.
-  "saturacao-oxigenio": { universal: { min: 95 }, descricao: "Percentual de hemoglobina saturada com oxigênio (SpO2). Valores abaixo de 95% indicam hipoxemia leve." },
+  // ── Oximetria / Gasometria ─────────────────────────────────────────────
+  // Mantém SpO₂ separado de saturações de gasometria para não misturar venoso com arterial.
+  "saturacao-oxigenio": { universal: { min: 95 }, descricao: "Saturação periférica de oxigênio (SpO₂) estimada por oxímetro. Valores abaixo do esperado devem ser confirmados no contexto clínico e, quando necessário, por gasometria." },
+  "saturacao-oxigenio-arterial": { universal: { min: 95 }, descricao: "Saturação arterial de oxigênio (SaO₂) medida ou calculada em gasometria arterial. Reflete a fração da hemoglobina arterial ligada ao oxigênio e não deve ser misturada com saturação venosa." },
+  "saturacao-o2-arterial": { universal: { min: 95 }, descricao: "Saturação arterial de oxigênio (SaO₂) medida ou calculada em gasometria arterial. Reflete a fração da hemoglobina arterial ligada ao oxigênio e não deve ser misturada com saturação venosa." },
+  "saturacao-oxigenio-venoso": { descricao: "Saturação venosa de oxigênio (SvO₂ ou saturação venosa central/mista, conforme a amostra). Reflete o balanço entre oferta e consumo de oxigênio; não é SpO₂ e não indica hipoxemia arterial isoladamente." },
+  "saturacao-o2-venosa": { descricao: "Saturação venosa de oxigênio (SvO₂ ou saturação venosa central/mista, conforme a amostra). Reflete o balanço entre oferta e consumo de oxigênio; não é SpO₂ e não indica hipoxemia arterial isoladamente." },
+  "po2-arterial": { universal: { min: 80, max: 100 }, descricao: "Pressão parcial arterial de oxigênio (PaO₂). Avalia a oxigenação no sangue arterial e deve ser interpretada junto com FiO₂, idade, altitude e quadro clínico." },
+  "po2-venoso": { universal: { min: 25, max: 40 }, descricao: "Pressão parcial venosa de oxigênio (PvO₂). Representa oxigênio remanescente no sangue venoso e não deve ser comparada diretamente com a PaO₂ arterial." },
+  "pco2-arterial": { universal: { min: 35, max: 45 }, descricao: "Pressão parcial arterial de dióxido de carbono (PaCO₂). Indica ventilação alveolar e participa da avaliação de distúrbios ácido-base respiratórios." },
+  "pco2-venoso": { universal: { min: 41, max: 51 }, descricao: "Pressão parcial venosa de dióxido de carbono (PvCO₂). Costuma ser mais alta que a arterial e deve ser interpretada conforme o tipo de amostra e o contexto clínico." },
 
   // ── Coagulação ─────────────────────────────────────────────────────────
   "tempo-protrombina": { universal: { min: 11, max: 15   }, descricao: "Tempo de Protrombina (TP). Avalia a via extrínseca da coagulação. Prolongado indica risco de sangramento ou uso de anticoagulante." },
@@ -111,10 +117,14 @@ const REFERENCES: Record<string, SexRanges> = {
   "ferro-serico":           { male: { min: 70, max: 180 }, female: { min: 60, max: 160 }, descricao: "Ferro em circulação no sangue. Baixo causa anemia; deve ser interpretado junto com ferritina e TIBC." },
   tibc:                     { universal: { min: 240, max: 450 }, descricao: "Capacidade total de ligação do ferro. Elevada indica deficiência de ferro; baixa, sobrecarga ou inflamação." },
   "saturacao-transferrina": { universal: { min: 20,  max: 50  }, descricao: "Percentual da transferrina ocupado por ferro. Baixo confirma deficiência; alto indica sobrecarga." },
+  "indice-saturacao-transferrina": { universal: { min: 20,  max: 50  }, descricao: "Índice de saturação da transferrina. Mostra o percentual da transferrina ocupado por ferro; baixo sugere deficiência de ferro e alto pode indicar sobrecarga." },
 
   // ── Hormônios ──────────────────────────────────────────────────────────
   cortisol:             { universal: { min: 5, max: 25 }, descricao: "Hormônio do estresse produzido pelas adrenais. Regula energia, imunidade e resposta ao estresse." },
   "testosterona-total": { male: { min: 270, max: 1070 }, female: { min: 15, max: 70 }, descricao: "Principal hormônio sexual masculino, presente em ambos os sexos. Influencia libido, massa muscular e humor." },
+  "testosterona-biodisponivel": { descricao: "Fração da testosterona disponível para ação nos tecidos, calculada a partir da testosterona total, SHBG e albumina. Ajuda a avaliar sintomas quando a testosterona total isolada não explica o quadro." },
+  "testosterona-biodisponível": { descricao: "Fração da testosterona disponível para ação nos tecidos, calculada a partir da testosterona total, SHBG e albumina. Ajuda a avaliar sintomas quando a testosterona total isolada não explica o quadro." },
+  shbg: { descricao: "Globulina ligadora de hormônios sexuais. Controla quanto da testosterona e do estradiol fica livre ou biodisponível; alterações mudam a interpretação dos hormônios totais." },
   fsh:          { descricao: "Hormônio folículo-estimulante, da hipófise. Regula ovários e testículos; usado para avaliar fertilidade e menopausa." },
   lh:           { descricao: "Hormônio luteinizante, da hipófise. Controla a ovulação e a produção de testosterona; avalia fertilidade e função gonadal." },
   estradiol:    { descricao: "Principal estrogênio. Regula o ciclo menstrual e a saúde óssea; varia conforme a fase do ciclo e a menopausa." },
@@ -185,8 +195,17 @@ const KEYWORD_ALIASES: [RegExp, string][] = [
   [/vitamina b12|cobalamina/, "vitamina-b12"],
   [/acido folico|folato/, "acido-folico"],
   [/ferritina/, "ferritina"],
+  [/saturacao.*transferrina|indice.*saturacao.*transferrina/, "indice-saturacao-transferrina"],
+  [/testosterona.*biodisponivel/, "testosterona-biodisponivel"],
+  [/\bshbg\b|globulina transportadora.*hormonios sexuais|globulina ligadora.*hormonios sexuais/, "shbg"],
   [/\btsh\b|tireoestimulante/, "tsh"],
-  [/saturacao.*(oxigenio|o2)|\bspo2\b|oximetria/, "saturacao-oxigenio"],
+  [/saturacao.*(venosa|venoso)/, "saturacao-oxigenio-venoso"],
+  [/saturacao.*arterial/, "saturacao-oxigenio-arterial"],
+  [/\bspo2\b|oximetria|saturacao.*(oxigenio|o2)/, "saturacao-oxigenio"],
+  [/\bpao2\b|po2.*arterial|pressao parcial.*oxigenio.*arterial/, "po2-arterial"],
+  [/\bpvo2\b|po2.*venos|pressao parcial.*oxigenio.*venos/, "po2-venoso"],
+  [/\bpaco2\b|pco2.*arterial|pressao parcial.*dioxido.*carbono.*arterial|pressao parcial.*co2.*arterial/, "pco2-arterial"],
+  [/\bpvco2\b|pco2.*venos|pressao parcial.*dioxido.*carbono.*venos|pressao parcial.*co2.*venos/, "pco2-venoso"],
   [/protrombina|\btp\b/, "tempo-protrombina"],
   [/\binr\b/, "inr"],
   [/tromboplastina.*parcial|\bttpa\b|\baptt\b/, "ttpa"],
