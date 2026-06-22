@@ -28,7 +28,7 @@ voltadas ao paciente tornam-se defensáveis quando são ferramentas voltadas ao 
 que um profissional licenciado é o decisor e toda saída de IA é registrada, fundamentada
 em fonte e exige aceite humano.**
 
-O "HealthAxys Score" e a "prescrição de hábitos" não são o app dizendo ao paciente o que
+O "HealthAxis Score" e a "prescrição de hábitos" não são o app dizendo ao paciente o que
 fazer. São instrumentos que o **médico** calcula, revisa, edita e emite. O paciente os
 recebe como o plano do seu médico, não como conselho médico do software.
 
