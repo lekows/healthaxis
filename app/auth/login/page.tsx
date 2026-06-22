@@ -18,6 +18,28 @@ export default function LoginPage() {
     if (oauthError) setError(`Erro ao entrar com provedor externo: ${oauthError}`);
   }, []);
 
+  async function resolvePostLoginRoute() {
+    const supabase = createClient();
+
+    const { data: adminProfile } = await supabase
+      .from("platform_admin_profiles")
+      .select("id, role, active")
+      .eq("active", true)
+      .in("role", ["clinical_admin", "security_admin"])
+      .maybeSingle();
+
+    if (adminProfile) return "/doctor/admin";
+
+    const { data: doctorProfile } = await supabase
+      .from("doctor_profiles")
+      .select("id")
+      .maybeSingle();
+
+    if (doctorProfile) return "/doctor";
+
+    return "/dashboard";
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -36,7 +58,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    const targetRoute = await resolvePostLoginRoute();
+    router.replace(targetRoute);
     router.refresh();
   }
 
