@@ -19,6 +19,8 @@ import { ConsultationReminderCard } from "@/components/dashboard/ConsultationRem
 import { ShareWithDoctorCard } from "@/components/dashboard/ShareWithDoctorCard";
 import { computeOrganizationScore, nextBestAction, type ScoreSignal } from "@/lib/health-organization-score";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const clinicalAdmin = await getClinicalAdminProfile();
   if (clinicalAdmin) redirect("/doctor/admin");

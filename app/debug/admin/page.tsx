@@ -12,7 +12,7 @@ type DiagnosticResult = {
 
 async function withTimeout<T>(
   label: string,
-  task: Promise<T>,
+  task: PromiseLike<T>,
   timeoutMs = 5000
 ): Promise<DiagnosticResult> {
   const startedAt = Date.now();

@@ -18,30 +18,6 @@ export default function LoginPage() {
     if (oauthError) setError(`Erro ao entrar com provedor externo: ${oauthError}`);
   }, []);
 
-  async function resolvePostLoginRoute(userId: string) {
-    const supabase = createClient();
-
-    const { data: adminProfile } = await supabase
-      .from("platform_admin_profiles")
-      .select("id, role, active")
-      .eq("id", userId)
-      .eq("active", true)
-      .in("role", ["clinical_admin", "security_admin"])
-      .maybeSingle();
-
-    if (adminProfile) return "/doctor/admin";
-
-    const { data: doctorProfile } = await supabase
-      .from("doctor_profiles")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (doctorProfile) return "/doctor";
-
-    return "/dashboard";
-  }
-
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -60,9 +36,9 @@ export default function LoginPage() {
       return;
     }
 
-    const targetRoute = await resolvePostLoginRoute(data.user.id);
-    router.replace(targetRoute);
-    router.refresh();
+    // A decisão de papel é resolvida no servidor (/auth/post-login) para não
+    // depender de queries no client, que podiam pendurar o botão "Entrando...".
+    router.replace("/auth/post-login");
   }
 
   async function handleOAuth(provider: "google" | "apple") {
