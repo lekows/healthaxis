@@ -18,12 +18,13 @@ export default function LoginPage() {
     if (oauthError) setError(`Erro ao entrar com provedor externo: ${oauthError}`);
   }, []);
 
-  async function resolvePostLoginRoute() {
+  async function resolvePostLoginRoute(userId: string) {
     const supabase = createClient();
 
     const { data: adminProfile } = await supabase
       .from("platform_admin_profiles")
       .select("id, role, active")
+      .eq("id", userId)
       .eq("active", true)
       .in("role", ["clinical_admin", "security_admin"])
       .maybeSingle();
@@ -33,6 +34,7 @@ export default function LoginPage() {
     const { data: doctorProfile } = await supabase
       .from("doctor_profiles")
       .select("id")
+      .eq("id", userId)
       .maybeSingle();
 
     if (doctorProfile) return "/doctor";
@@ -46,10 +48,10 @@ export default function LoginPage() {
     setError("");
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      if (error.message.includes("Email not confirmed")) {
+    if (error || !data.user) {
+      if (error?.message.includes("Email not confirmed")) {
         setError("Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.");
       } else {
         setError("E-mail ou senha incorretos.");
@@ -58,7 +60,7 @@ export default function LoginPage() {
       return;
     }
 
-    const targetRoute = await resolvePostLoginRoute();
+    const targetRoute = await resolvePostLoginRoute(data.user.id);
     router.replace(targetRoute);
     router.refresh();
   }
