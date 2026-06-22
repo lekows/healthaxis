@@ -9,6 +9,8 @@ import {
   getClinicalAdminProfile,
 } from "@/lib/supabase/clinical-admin-queries";
 
+export const dynamic = "force-dynamic";
+
 export default async function DoctorAdminPage({
   searchParams,
 }: {
