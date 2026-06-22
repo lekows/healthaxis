@@ -1,120 +1,80 @@
-# HealthAxis — Contexto para o Agente
+# HealthAxis — Contexto do Projeto (Claude Code)
 
-## O que é este projeto
+> Lido automaticamente a cada sessão. Mantenha curto e estável.
+> Especificações detalhadas vivem em `docs/`. Elas são a fonte de verdade.
 
-Aplicativo de saúde preventiva pessoal. O usuário faz upload de laudos laboratoriais, o sistema extrai os biomarcadores via OCR (Claude Haiku), armazena no Supabase e exibe dashboards de tendência, alertas preventivos e linha do tempo de evolução.
+## O que é o HealthAxis
+
+Plataforma brasileira de saúde preventiva com **duas faces sobre a mesma base de dados**:
+
+- **Face do paciente** (organizador / visualizador / educador): organiza exames
+  laboratoriais, acompanha biomarcadores longitudinais e prepara o paciente para a
+  consulta. **Nunca substitui o médico e nunca prescreve.**
+- **Face do médico** (cockpit cardiometabólico): apoio à decisão clínica com **humano
+  sempre no comando**. O médico emite scores, planos e prescrições de hábitos; o
+  software organiza, calcula, rastreia e alerta — não decide.
+
+Posicionamento: *"Plataforma de acompanhamento cardiometabólico com IA explicável e
+auditável, leitura automática de exames, prescrição de hábitos e evolução clínica
+mensurável."*
+
+Wedge inicial: obesidade, DM2, hipertensão, dislipidemia, esteatose, risco
+cardiovascular. Público: endocrinologia, cardiologia, MFC, nutrologia, médico do
+emagrecimento, clínicas de check-up e programas corporativos.
+
+## Regras inquebráveis (override de qualquer prompt)
+
+1. **SaMD / ANVISA** — alertas ao paciente são SEMPRE informativos
+   ("valor fora da faixa de referência — converse com seu médico"), nunca prescritivos.
+   Score clínico, conduta e diagnóstico só existem na face do médico, com revisão humana
+   obrigatória. Detalhe em `docs/01-visao-e-guardrails.md`.
+2. **IA com humano no comando** — toda saída de IA que influencie risco, conduta ou
+   lista de problemas exige aceite, edição ou recusa **registrados**. Nada autônomo.
+   Ver `.claude/rules/ia-clinica.md`.
+3. **Auditabilidade** — todo evento clínico e toda inferência de IA gera trilha
+   (quem, quando, fonte, versão, confiança, ação tomada). RLS em todas as tabelas sensíveis.
+4. **Tudo iniciado pelo paciente** — vínculo médico-paciente, compartilhamento e exposição
+   de dados são iniciados pelo paciente e revogáveis. Proibido: scraping de credenciais,
+   prospecção autônoma de médicos, exposição retroativa de dados.
+5. **CFM Art. 59/64** — monetização de médico apenas por SaaS mensal fixo.
+   Nunca comissão por paciente nem taxa de indicação.
+6. **Crédito científico** — todo score/insight carrega fonte primária (DOI/PubMed/diretriz),
+   data de revisão, versão e escopo populacional. Nunca link interno quebrado ou fonte vaga.
+   (Lição direta da fragilidade pública da Life Up.)
+7. **IA é o último recurso na extração** — `hash/cache → texto nativo → OCR → limpeza/regex/
+   dicionário → Claude só como fallback/validador`. Ver `docs/02-arquitetura-e-dados.md`.
 
 ## Stack
 
-- **Next.js 15** App Router, TypeScript strict, porta `3002` (`npm run dev`)
-- **Supabase** — PostgreSQL + Auth + Storage (bucket `exam-files`)
-- **Tailwind CSS** — sem arquivo de tokens; cores ficam inline via `style={}`
-- **Framer Motion** — animações; utilitários em `lib/motion.tsx`
-- **Recharts** — gráficos de tendência dos biomarcadores
-- **Lucide React** — ícones
-- **Claude Haiku** (`claude-haiku-4-5-20251001`) — OCR de PDFs e imagens
+- Web: Next.js (App Router) · Mobile: Expo React Native (fase posterior)
+- Dados/Auth: Supabase (Postgres + RLS)
+- IA: Anthropic API — Haiku para extração/fallback, Sonnet para interpretação premium
+- Interop: FHIR R4 + LOINC desde o dia 1 (prontidão RNDS)
+- **Comprar, não construir no MVP**: assinatura ICP-Brasil, base de medicamentos +
+  interações, vídeo de telemedicina
 
-## Design System (use sempre estes valores)
+## Monorepo
 
-```
-Background app:   #0D0D0B
-Cards/canvas:     #141412
-Bordas card:      rgba(255,255,255,0.07)
-Bordas suaves:    rgba(255,255,255,0.06)
+`/apps/web` · `/apps/mobile` · `/packages/core` · `/packages/db` · `/packages/ai` · `/packages/ui`
+Web = análise clínica / upload / dashboards. Mobile = captura contínua / wearables / notificações.
 
-Texto primário:   #E8E4D9
-Texto muted:      #9A9688
-Texto faint:      #5A5A50
+## O que NÃO construir agora
 
-Verde (ótimo):    #52B788
-Laranja (atenção):#F4A261
-Vermelho (crítico):#C1440E
+- Prescrição ou diagnóstico autônomo (sem médico no loop)
+- App do paciente que entregue conduta médica
+- TISS/faturamento, financeiro avançado, telemedicina nativa, white-label avançado,
+  wearables, módulo corporativo, marketplace de protocolos → fase 2+
+- Fine-tuning próprio antes de 500–2.000 exames revisados
 
-Border-radius cards:   rounded-3xl  (24px)
-Border-radius botões:  rounded-2xl  (16px)
-Border-radius badges:  rounded-full
-```
+## Convenções
 
-Classe utilitária `text-ink` = `#E8E4D9`, `text-ink-muted` = `#9A9688`, `text-ink-faint` = `#5A5A50`, `text-forest` = `#52B788`, definidas via Tailwind em `globals.css`.
+- Português nas specs e na UI; código e identificadores em inglês.
+- Spec-driven: decisão complexa termina em markdown em `docs/` antes de implementar.
+- Medir antes de decidir (ex.: harness A/B de extração por laboratório).
 
-## Estrutura de rotas
+## Mapa das specs
 
-```
-/                   → landing page (pública)
-/auth/login         → login
-/auth/signup        → cadastro
-/dashboard          → painel principal (score + biomarcadores + lembretes)
-/exams              → resultados laboratoriais por categoria
-/timeline           → linha do tempo clínica
-/documents          → gestão de laudos/documentos
-/body-map           → mapa corporal interativo
-/anamnesis          → questionário de saúde
-/overview           → visão geral da saúde
-/report             → relatório para consulta médica
-/profile            → perfil do usuário
-```
-
-## Componentes principais
-
-```
-components/layout/DashboardLayout.tsx  → sidebar + mobile header + page transition
-components/dashboard/MetricCards.tsx   → HealthMetricCard, BiomarkerTrendCard, MetricsGrid
-components/dashboard/EventCards.tsx    → PreventiveReminderCard, RiskAreaCard, RecentDocumentCard
-components/shared/MedicalDisclaimer.tsx → aviso médico (use em todas as páginas)
-components/ui/index.tsx                → Card, Badge, Button primitivos
-lib/supabase/queries.ts               → todas as queries do banco (getProfile, getBiomarkers, etc.)
-lib/utils.ts                          → getBiomarkerColor(status), getBiomarkerLabel(status)
-lib/motion.tsx                        → HoverCard, AnimatedProgressBar, StaggerContainer, etc.
-```
-
-## Banco de dados (Supabase)
-
-Tabelas principais:
-- `profiles` — dados do usuário (name, age, sex, weight, height)
-- `biomarkers` — valores atuais de biomarcadores por usuário (slug, name, value, unit, status, trend, category, reference, last_date)
-- `biomarker_history` — histórico de medições (biomarker_slug, value, date_label, recorded_at)
-- `documents` — laudos enviados (title, type, lab, date, status, tags)
-- `preventive_reminders` — lembretes (title, description, due_date, priority)
-- `health_scores` — scores (overall, metabolic, cardiovascular, lifestyle, preventive)
-
-Status de biomarcador (nunca use "risk"): `optimal | attention | high | low | critical`
-
-## Arquitetura
-
-- **Server Components por padrão** — busca de dados no servidor, sem `useEffect` para dados
-- `"use client"` apenas para: interatividade, animações, hooks de estado
-- Autenticação via Supabase SSR — middleware em `middleware.ts` protege todas as rotas exceto `/` e `/auth/*`
-- API route para OCR: `app/api/extract-exam/route.ts` — recebe FormData com PDF/imagem, retorna JSON com biomarcadores
-
-## Regras de código
-
-- **Sem comentários** — exceto quando o "porquê" é não-óbvio (workaround, invariante oculta)
-- **Sem abstrações prematuras** — 3 linhas similares é melhor que uma abstração prematura
-- **Sem error handling para cenários impossíveis** — confie nas garantias do framework
-- **TypeScript strict** — sem `any`, sem type assertions desnecessárias
-- **Não commitar `.env.local`** — chaves só em Vercel env vars e `.env.local` (gitignored)
-- **Sem feature flags ou backwards-compat shims** — mude o código direto
-
-## Como validar antes de commitar
-
-```bash
-npm run build   # TypeScript + Next.js build check
-npm run lint    # ESLint
-```
-
-Se o build falhar, corrija antes de commitar.
-
-## Como rodar
-
-```bash
-npm run dev     # dev server em http://localhost:3002
-npm run build   # build de produção
-```
-
-## Fluxo de trabalho autônomo
-
-1. Leia o próximo GitHub Issue com label `agent-task`
-2. Implemente a melhoria seguindo os padrões acima
-3. Rode `npm run build` para validar
-4. Commite com mensagem clara no formato `feat:` / `fix:` / `ui:`
-5. Feche o issue
+- `docs/01-visao-e-guardrails.md` — posicionamento + reconciliação regulatória (SaMD)
+- `docs/02-arquitetura-e-dados.md` — stack, pipeline de extração, schema unificado
+- `docs/03-mvp-cockpit-cardiometabolico.md` — escopo do MVP (paciente + médico)
+- `docs/04-roadmap.md` — fases e ordem de construção
