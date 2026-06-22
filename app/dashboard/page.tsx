@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { BiomarkerPanel } from "@/components/dashboard/BiomarkerPanel";
 import { PreventiveReminderCard, RiskAreaCard, RecentDocumentCard } from "@/components/dashboard/EventCards";
@@ -6,6 +7,7 @@ import { CollapsibleList } from "@/components/dashboard/CollapsibleList";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile, getBiomarkers, getBiomarkerHistory, getDocuments, getPreventiveReminders, getDoctors, getMedications, getFamilyHistory } from "@/lib/supabase/queries";
 import { getLinkedDoctors, getIsDoctor } from "@/lib/supabase/doctor-queries";
+import { getClinicalAdminProfile } from "@/lib/supabase/clinical-admin-queries";
 import { Activity, ArrowRight, FlaskConical, Stethoscope, Upload } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { HealthOrganizationScoreCard } from "@/components/dashboard/HealthOrganizationScoreCard";
@@ -18,6 +20,9 @@ import { ShareWithDoctorCard } from "@/components/dashboard/ShareWithDoctorCard"
 import { computeOrganizationScore, nextBestAction, type ScoreSignal } from "@/lib/health-organization-score";
 
 export default async function DashboardPage() {
+  const clinicalAdmin = await getClinicalAdminProfile();
+  if (clinicalAdmin) redirect("/doctor/admin");
+
   const [profile, biomarkers, history, documents, reminders, doctors, linkedDoctors, medications, familyHistory, isDoctor] = await Promise.all([
     getProfile(),
     getBiomarkers(),
