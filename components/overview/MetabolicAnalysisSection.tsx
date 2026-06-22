@@ -42,22 +42,36 @@ export function MetabolicAnalysisSection({ initialRun }: Props) {
     }
   }
 
+  const reanalyzeStyle = {
+    color: "#52B788",
+    background: "rgba(82,183,136,0.12)",
+    border: "1px solid rgba(82,183,136,0.25)",
+  };
+
+  const ReanalyzeButton = () => (
+    <button
+      onClick={handleAnalyze}
+      disabled={loading}
+      className="flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-colors disabled:opacity-40"
+      style={reanalyzeStyle}
+    >
+      {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+      {loading ? "Reanalisando…" : "Reanalisar"}
+    </button>
+  );
+
   return (
     <div className="space-y-3">
       {initialRun ? (
         <>
           <MetabolicInsightsCard run={initialRun} />
-          <div className="flex items-center justify-end">
-            <button
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-medium transition-opacity hover:opacity-80 disabled:opacity-40"
-              style={{ background: "rgba(82,183,136,0.12)", color: "#52B788", border: "1px solid rgba(82,183,136,0.25)" }}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {loading ? "Reanalisando..." : "Reanalisar"}
-            </button>
+          <div className="hidden lg:flex items-center justify-end">
+            <ReanalyzeButton />
           </div>
+          <div className="lg:hidden fixed bottom-36 right-4 z-20">
+            <ReanalyzeButton />
+          </div>
+          {error && <p className="text-xs mt-3" style={{ color: "#C1440E" }}>{error}</p>}
         </>
       ) : (
         <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
