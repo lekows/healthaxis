@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
-import { getDoctorProfile, getMyInvites, getLinkedPatients } from "@/lib/supabase/doctor-queries";
+import { getDoctorProfile, getMyInvites, getDoctorCockpitPatients } from "@/lib/supabase/doctor-queries";
 import { DoctorDashboardClient } from "@/components/doctor/DoctorDashboardClient";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { Stethoscope } from "lucide-react";
@@ -12,7 +12,7 @@ export default async function DoctorPage() {
     getProfile(),
     getDoctorProfile(),
     getMyInvites(),
-    getLinkedPatients(),
+    getDoctorCockpitPatients(),
   ]);
 
   if (!doctorProfile) redirect("/doctor/setup");
