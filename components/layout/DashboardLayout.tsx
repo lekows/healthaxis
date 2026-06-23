@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
   Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode,
-  Heart, MoreHorizontal, ChevronDown, X, type LucideIcon
+  Heart, MoreHorizontal, ChevronDown, X, BrainCircuit, type LucideIcon
 } from "lucide-react";
 import { ease } from "@/lib/motion";
 import { signOut } from "@/app/auth/actions";
@@ -34,7 +34,11 @@ export function DashboardLayout({ children, userName, isDoctor = false }: { chil
   const displayName = userName?.trim() || "Usuário";
 
   const secondaryNav: NavItem[] = isDoctor
-    ? [...baseSecondaryNav, { href: "/doctor", label: "Painel Médico", icon: Stethoscope }]
+    ? [
+        ...baseSecondaryNav,
+        { href: "/doctor", label: "Painel Médico", icon: Stethoscope },
+        { href: "/doctor/reviews", label: "Revisão IA", icon: BrainCircuit },
+      ]
     : baseSecondaryNav;
 
   const secondaryActive = secondaryNav.some(item => pathname === item.href);
