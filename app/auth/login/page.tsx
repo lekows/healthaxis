@@ -71,7 +71,12 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider">Senha</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-white/50 uppercase tracking-wider">Senha</label>
+              <Link href="/auth/recover" className="text-xs text-white/50 hover:text-white transition-colors">
+                Esqueci minha senha
+              </Link>
+            </div>
             <input
               type="password"
               required
