@@ -9,7 +9,7 @@ type RecoverySender = (
   options: { redirectTo: string }
 ) => Promise<{ error: { message: string } | null }>;
 
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 60000;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -50,14 +50,14 @@ export default function RecoverPage() {
       );
 
       if (result.error) {
-        setError("Não foi possível enviar o link. Verifique o e-mail e tente novamente.");
+        setError("Não foi possível enviar o link agora. Aguarde um minuto e tente novamente.");
         return;
       }
 
-      setMessage("Se este e-mail estiver cadastrado, enviaremos um link para redefinição. Confira também spam e promoções.");
+      setMessage("Se este e-mail estiver cadastrado, enviaremos um link para redefinição. Confira também spam, promoções e lixo eletrônico.");
     } catch (requestError) {
-      console.error("Recovery request failed", requestError);
-      setError("A solicitação demorou demais. Verifique sua conexão e tente novamente.");
+      console.error("Recovery request did not finish in time", requestError);
+      setMessage("A solicitação foi iniciada, mas demorou para responder. Confira seu e-mail, spam, promoções e lixo eletrônico. Se não chegar, tente novamente em alguns minutos.");
     } finally {
       setLoading(false);
     }
