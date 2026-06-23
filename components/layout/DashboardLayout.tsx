@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
   Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode,
-  Heart, MoreHorizontal, ChevronDown, X, BrainCircuit, ShieldCheck, type LucideIcon
+  Heart, MoreHorizontal, ChevronDown, X, BrainCircuit, ShieldCheck, Users, type LucideIcon
 } from "lucide-react";
 import { ease } from "@/lib/motion";
 import { signOut } from "@/app/auth/actions";
@@ -32,6 +32,7 @@ const baseSecondaryNav: NavItem[] = [
 // Face do médico: navegação 100% clínica, sem itens de autosserviço do paciente.
 const doctorNav: NavItem[] = [
   { href: "/doctor", label: "Cockpit", icon: Stethoscope },
+  { href: "/doctor/patients", label: "Pacientes", icon: Users },
   { href: "/doctor/reviews", label: "Revisão IA", icon: BrainCircuit },
   { href: "/profile", label: "Configurações", icon: Settings }
 ];
@@ -42,11 +43,11 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
 
   // Médico vê apenas ferramentas clínicas (cockpit, revisão de IA, admin se
   // aplicável, perfil). Paciente mantém o menu de autosserviço.
-  const primaryItems: NavItem[] = isDoctor
-    ? isClinicalAdmin
-      ? [doctorNav[0], doctorNav[1], { href: "/doctor/admin", label: "Admin clínico", icon: ShieldCheck }, doctorNav[2]]
-      : doctorNav
-    : primaryNav;
+  // Admin clínico entra antes do último item (Configurações), sem derrubá-lo.
+  const doctorItems: NavItem[] = isClinicalAdmin
+    ? [...doctorNav.slice(0, -1), { href: "/doctor/admin", label: "Admin clínico", icon: ShieldCheck }, doctorNav[doctorNav.length - 1]]
+    : doctorNav;
+  const primaryItems: NavItem[] = isDoctor ? doctorItems : primaryNav;
   const secondaryNav: NavItem[] = isDoctor ? [] : baseSecondaryNav;
   const hasSecondary = secondaryNav.length > 0;
 
