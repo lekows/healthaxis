@@ -66,7 +66,7 @@ export async function getDoctorAgentReviewQueue(
 
   let query = supabase
     .from("agent_runs")
-    .select("id, agent_name, patient_id, model_used, confidence_score, output_json, edited_output, human_decision, human_decision_by, human_decision_at, status, created_at, completed_at, patient:patient_id(id, name, dob, sex)")
+    .select("id, agent_name, patient_id, model_used, confidence_score, output_json, edited_output, human_decision, human_decision_by, human_decision_at, status, created_at, completed_at")
     .in("patient_id", patientIds)
     .eq("status", "completed")
     .order("completed_at", { ascending: false })
@@ -74,12 +74,21 @@ export async function getDoctorAgentReviewQueue(
 
   if (decision !== "all") query = query.eq("human_decision", decision);
 
-  const { data, error } = await query;
+  const [{ data: agentRuns, error }, { data: profiles }] = await Promise.all([
+    query,
+    supabase
+      .from("profiles")
+      .select("id, name, dob, sex")
+      .in("id", patientIds),
+  ]);
+
   if (error) return [];
 
-  return (data ?? []).map((item) => ({
-    ...item,
-    patient: Array.isArray(item.patient) ? item.patient[0] ?? null : item.patient ?? null,
+  const profilesById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+
+  return (agentRuns ?? []).map((agentRun) => ({
+    ...agentRun,
+    patient: profilesById.get(agentRun.patient_id) ?? null,
   })) as AgentReviewQueueItem[];
 }
 
