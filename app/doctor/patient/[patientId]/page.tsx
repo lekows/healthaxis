@@ -10,15 +10,20 @@ import {
   ShieldCheck,
   Stethoscope,
 } from "lucide-react";
+import { AgentReviewCard } from "@/components/doctor/AgentReviewCard";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { getProfile } from "@/lib/supabase/queries";
 import {
   getDoctorProfile,
   getLinkedPatientPanel,
-  getPatientLatestMetabolicAnalysis,
   getWatchedBiomarkers,
 } from "@/lib/supabase/doctor-queries";
+import {
+  getAgentReviewHighlights,
+  getAgentReviewSummary,
+  getPatientAgentRunsForReview,
+} from "@/lib/supabase/agent-review-queries";
 
 function getAge(dob: string | null) {
   if (!dob) return null;
@@ -75,12 +80,12 @@ export default async function DoctorPatientPage({
 }) {
   const { patientId } = await params;
 
-  const [profile, doctorProfile, panel, watchedBiomarkers, latestAnalysis] = await Promise.all([
+  const [profile, doctorProfile, panel, watchedBiomarkers, agentRuns] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
     getLinkedPatientPanel(patientId),
     getWatchedBiomarkers(patientId),
-    getPatientLatestMetabolicAnalysis(patientId),
+    getPatientAgentRunsForReview(patientId),
   ]);
 
   if (!doctorProfile) redirect("/doctor/setup");
@@ -94,6 +99,7 @@ export default async function DoctorPatientPage({
   const alteredBiomarkers = sortedBiomarkers.filter((item) => item.status !== "optimal");
   const criticalBiomarkers = sortedBiomarkers.filter((item) => ["critical", "high", "low"].includes(item.status));
   const latestDocument = panel.documents[0] ?? null;
+  const pendingAgentRuns = agentRuns.filter((run) => run.human_decision === "pending");
 
   return (
     <DashboardLayout userName={profile?.name} isDoctor>
@@ -148,14 +154,14 @@ export default async function DoctorPatientPage({
           </div>
           <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
             <ShieldCheck size={18} style={{ color: "#52B788" }} />
-            <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{watchedBiomarkers.length}</p>
-            <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Marcadores monitorados</p>
+            <p className="text-3xl font-bold mt-4" style={{ color: pendingAgentRuns.length > 0 ? "#F4A261" : "#E8E4D9" }}>{pendingAgentRuns.length}</p>
+            <p className="text-xs mt-1" style={{ color: "#9A9688" }}>IA pendente de revisão</p>
           </div>
         </div>
 
         <section className="rounded-3xl p-5 lg:p-6" style={{ background: "rgba(244,162,97,0.06)", border: "1px solid rgba(244,162,97,0.18)" }}>
           <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2" style={{ color: "#F4A261" }}>
-            <ClipboardIcon /> Resumo executivo para revisão médica
+            <FileText size={14} /> Resumo executivo para revisão médica
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4 text-sm">
             <div>
@@ -168,10 +174,28 @@ export default async function DoctorPatientPage({
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>IA revisável</p>
-              <p className="mt-1" style={{ color: "#E8E4D9" }}>{latestAnalysis ? "Há análise metabólica para conferência" : "Nenhuma análise metabólica concluída"}</p>
+              <p className="mt-1" style={{ color: "#E8E4D9" }}>{agentRuns.length > 0 ? `${agentRuns.length} análise(s), ${pendingAgentRuns.length} pendente(s)` : "Nenhuma análise metabólica concluída"}</p>
             </div>
           </div>
         </section>
+
+        {agentRuns.length > 0 && (
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "#9A9688" }}>Revisão humana de IA</h2>
+              <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>Aceite, edite ou rejeite interpretações automatizadas antes de qualquer uso clínico.</p>
+            </div>
+            {agentRuns.map((agentRun) => (
+              <AgentReviewCard
+                key={agentRun.id}
+                agentRun={agentRun}
+                patientId={patient.id}
+                summary={getAgentReviewSummary(agentRun)}
+                highlights={getAgentReviewHighlights(agentRun)}
+              />
+            ))}
+          </section>
+        )}
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
           <section className="rounded-3xl p-5 lg:p-6" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -245,8 +269,4 @@ export default async function DoctorPatientPage({
       </div>
     </DashboardLayout>
   );
-}
-
-function ClipboardIcon() {
-  return <FileText size={14} />;
 }
