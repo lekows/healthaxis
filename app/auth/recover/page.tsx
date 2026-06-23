@@ -9,6 +9,24 @@ type RecoverySender = (
   options: { redirectTo: string }
 ) => Promise<{ error: { message: string } | null }>;
 
+const REQUEST_TIMEOUT_MS = 15000;
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("Tempo esgotado."));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 export default function RecoverPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,20 +39,28 @@ export default function RecoverPage() {
     setMessage("");
     setError("");
 
-    const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/update-password`;
-    const methodName = ["reset", "Password", "For", "Email"].join("") as keyof typeof supabase.auth;
-    const sendRecovery = supabase.auth[methodName] as RecoverySender;
-    const result = await sendRecovery(email, { redirectTo });
+    try {
+      const supabase = createClient();
+      const redirectTo = `${window.location.origin}/auth/update-password`;
+      const methodName = ["reset", "Password", "For", "Email"].join("") as keyof typeof supabase.auth;
+      const sendRecovery = supabase.auth[methodName] as RecoverySender;
+      const result = await withTimeout(
+        sendRecovery(email.trim().toLowerCase(), { redirectTo }),
+        REQUEST_TIMEOUT_MS
+      );
 
-    if (result.error) {
-      setError("Não foi possível enviar o link. Verifique o e-mail e tente novamente.");
+      if (result.error) {
+        setError("Não foi possível enviar o link. Verifique o e-mail e tente novamente.");
+        return;
+      }
+
+      setMessage("Se este e-mail estiver cadastrado, enviaremos um link para redefinição. Confira também spam e promoções.");
+    } catch (requestError) {
+      console.error("Recovery request failed", requestError);
+      setError("A solicitação demorou demais. Verifique sua conexão e tente novamente.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setMessage("Se este e-mail estiver cadastrado, enviaremos um link para redefinição.");
-    setLoading(false);
   }
 
   return (
@@ -55,6 +81,7 @@ export default function RecoverPage() {
               onChange={(event) => setEmail(event.target.value)}
               className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white text-sm outline-none focus:border-white/30 transition-colors"
               placeholder="seu@email.com"
+              autoComplete="email"
             />
           </div>
 
