@@ -1,1 +1,0 @@
-Teste de ferramenta para fluxo de auth.
