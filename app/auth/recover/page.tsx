@@ -22,7 +22,7 @@ export default function RecoverPage() {
     setError("");
 
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=/auth/update-password`;
+    const redirectTo = `${window.location.origin}/auth/update-password`;
     const methodName = ["reset", "Password", "For", "Email"].join("") as keyof typeof supabase.auth;
     const sendRecovery = supabase.auth[methodName] as RecoverySender;
     const result = await sendRecovery(email, { redirectTo });
