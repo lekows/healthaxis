@@ -16,67 +16,58 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import type { DoctorInvite, LinkedPatient } from "@/lib/supabase/doctor-queries";
+import type { DoctorCockpitPatient, DoctorCockpitSignal, DoctorInvite } from "@/lib/supabase/doctor-queries";
 
 interface Props {
   initialInvite: DoctorInvite | null;
-  patients: LinkedPatient[];
+  patients: DoctorCockpitPatient[];
   baseUrl: string;
 }
 
-type PatientSignal = "review" | "followup" | "stable";
+type PatientFilter = "all" | DoctorCockpitSignal;
 
-function daysSince(date: string) {
-  return Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 86400000));
-}
-
-function getPatientSignal(patient: LinkedPatient, index: number): PatientSignal {
-  const days = daysSince(patient.consent_at);
-  if (days > 30 || index % 5 === 0) return "review";
-  if (days > 14 || index % 3 === 0) return "followup";
-  return "stable";
-}
-
-function getSignalLabel(signal: PatientSignal) {
-  if (signal === "review") return "Revisar dados";
+function getSignalLabel(signal: DoctorCockpitSignal) {
+  if (signal === "review") return "Revisar";
   if (signal === "followup") return "Acompanhar";
   return "Estável";
 }
 
-function getSignalStyle(signal: PatientSignal) {
+function getSignalStyle(signal: DoctorCockpitSignal) {
   if (signal === "review") return { background: "rgba(193,68,14,0.12)", border: "1px solid rgba(193,68,14,0.24)", color: "#F4A261" };
   if (signal === "followup") return { background: "rgba(244,162,97,0.1)", border: "1px solid rgba(244,162,97,0.22)", color: "#F4A261" };
   return { background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" };
+}
+
+function formatDate(date: string | null) {
+  if (!date) return "Sem dado";
+  return new Date(date).toLocaleDateString("pt-BR");
+}
+
+function formatDaysWithoutData(days: number | null) {
+  if (days === null) return "Sem dado";
+  if (days === 0) return "Hoje";
+  if (days === 1) return "1 dia";
+  return `${days} dias`;
 }
 
 export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Props) {
   const [invite, setInvite] = useState<DoctorInvite | null>(initialInvite);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | PatientSignal>("all");
+  const [filter, setFilter] = useState<PatientFilter>("all");
 
-  const patientRows = useMemo(() => patients.map((patient, index) => {
-    const signal = getPatientSignal(patient, index);
-    return {
-      ...patient,
-      signal,
-      daysLinked: daysSince(patient.consent_at),
-      name: patient.patient?.name ?? "Paciente",
-    };
-  }).sort((a, b) => {
-    const order: Record<PatientSignal, number> = { review: 0, followup: 1, stable: 2 };
-    return order[a.signal] - order[b.signal];
-  }), [patients]);
-
-  const filteredPatients = patientRows.filter((patient) => {
-    const matchesSearch = patient.name.toLowerCase().includes(search.toLowerCase());
+  const filteredPatients = useMemo(() => patients.filter((patient) => {
+    const patientName = patient.patient?.name ?? "Paciente";
+    const matchesSearch = patientName.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === "all" || patient.signal === filter;
     return matchesSearch && matchesFilter;
-  });
+  }), [patients, search, filter]);
 
-  const reviewCount = patientRows.filter((patient) => patient.signal === "review").length;
-  const followupCount = patientRows.filter((patient) => patient.signal === "followup").length;
-  const stableCount = patientRows.filter((patient) => patient.signal === "stable").length;
+  const reviewCount = patients.filter((patient) => patient.signal === "review").length;
+  const followupCount = patients.filter((patient) => patient.signal === "followup").length;
+  const stableCount = patients.filter((patient) => patient.signal === "stable").length;
+  const alteredBiomarkerCount = patients.reduce((total, patient) => total + patient.altered_biomarkers, 0);
+  const withoutRecentDataCount = patients.filter((patient) => patient.days_since_latest_data === null || patient.days_since_latest_data > 90).length;
 
   async function generateInvite() {
     setLoading(true);
@@ -115,7 +106,7 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
             <span className="text-xs font-medium" style={{ color: "#5A5A50" }}>prioridade</span>
           </div>
           <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{reviewCount}</p>
-          <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Pacientes para revisar dados</p>
+          <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Pacientes para revisar agora</p>
         </div>
 
         <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -149,7 +140,7 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
                 <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2" style={{ color: "#9A9688" }}>
                   <BarChart3 size={14} style={{ color: "#52B788" }} /> Radar clínico
                 </h2>
-                <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>Lista priorizada por necessidade operacional de revisão. Não emite diagnóstico nem conduta autônoma.</p>
+                <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>Lista priorizada com dados reais de vínculo, exames e biomarcadores. Não emite diagnóstico nem conduta autônoma.</p>
               </div>
               <div className="relative w-full lg:w-72">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#5A5A50" }} />
@@ -174,7 +165,7 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
                 return (
                   <button
                     key={item.value}
-                    onClick={() => setFilter(item.value as typeof filter)}
+                    onClick={() => setFilter(item.value as PatientFilter)}
                     className="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-opacity hover:opacity-80"
                     style={{
                       background: active ? "rgba(82,183,136,0.12)" : "rgba(255,255,255,0.04)",
@@ -196,36 +187,44 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredPatients.map((patient) => (
-                  <Link key={patient.id} href={`/doctor/patient/${patient.patient_id}`}
-                    className="group flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5 p-4 rounded-2xl transition-all hover:opacity-90"
-                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate" style={{ color: "#E8E4D9" }}>{patient.name}</p>
-                        <span className="px-2 py-1 rounded-full text-[11px] font-semibold" style={getSignalStyle(patient.signal)}>
-                          {getSignalLabel(patient.signal)}
-                        </span>
+                {filteredPatients.map((patient) => {
+                  const patientName = patient.patient?.name ?? "Paciente";
+                  return (
+                    <Link key={patient.id} href={`/doctor/patient/${patient.patient_id}`}
+                      className="group flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5 p-4 rounded-2xl transition-all hover:opacity-90"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold truncate" style={{ color: "#E8E4D9" }}>{patientName}</p>
+                          <span className="px-2 py-1 rounded-full text-[11px] font-semibold" style={getSignalStyle(patient.signal)}>
+                            {getSignalLabel(patient.signal)}
+                          </span>
+                        </div>
+                        <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>
+                          {patient.signal_reason} · vínculo ativo há {patient.days_linked} {patient.days_linked === 1 ? "dia" : "dias"}
+                        </p>
+                        <p className="text-xs mt-2 font-medium" style={{ color: "#9A9688" }}>{patient.next_action}</p>
                       </div>
-                      <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>
-                        Vínculo ativo há {patient.daysLinked} {patient.daysLinked === 1 ? "dia" : "dias"} · iniciado pelo paciente
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:w-[430px]">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wider" style={{ color: "#5A5A50" }}>Evolução</p>
-                        <p className="text-xs font-medium mt-1" style={{ color: "#9A9688" }}>Aguardando métricas</p>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:w-[560px]">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wider" style={{ color: "#5A5A50" }}>Alterados</p>
+                          <p className="text-xs font-medium mt-1" style={{ color: patient.altered_biomarkers > 0 ? "#F4A261" : "#9A9688" }}>{patient.altered_biomarkers}/{patient.total_biomarkers}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wider" style={{ color: "#5A5A50" }}>Exames</p>
+                          <p className="text-xs font-medium mt-1" style={{ color: "#9A9688" }}>{patient.document_count}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wider" style={{ color: "#5A5A50" }}>Último dado</p>
+                          <p className="text-xs font-medium mt-1" style={{ color: "#9A9688" }}>{formatDaysWithoutData(patient.days_since_latest_data)}</p>
+                        </div>
+                        <div className="hidden lg:flex items-center justify-end">
+                          <ChevronRight size={17} style={{ color: "#5A5A50" }} className="group-hover:translate-x-1 transition-transform" />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wider" style={{ color: "#5A5A50" }}>Exames</p>
-                        <p className="text-xs font-medium mt-1" style={{ color: "#9A9688" }}>Ver painel</p>
-                      </div>
-                      <div className="hidden lg:flex items-center justify-end">
-                        <ChevronRight size={17} style={{ color: "#5A5A50" }} className="group-hover:translate-x-1 transition-transform" />
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -234,12 +233,12 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
             <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
               <ClipboardList size={18} style={{ color: "#52B788" }} />
               <p className="text-sm font-semibold mt-3" style={{ color: "#E8E4D9" }}>Tarefas clínicas</p>
-              <p className="text-xs mt-1 leading-relaxed" style={{ color: "#9A9688" }}>Revisar exames novos, validar insights de IA e acompanhar pacientes sem dados recentes.</p>
+              <p className="text-xs mt-1 leading-relaxed" style={{ color: "#9A9688" }}>{alteredBiomarkerCount} biomarcadores alterados no radar; {withoutRecentDataCount} pacientes sem dado recente.</p>
             </div>
             <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
               <FileText size={18} style={{ color: "#52B788" }} />
               <p className="text-sm font-semibold mt-3" style={{ color: "#E8E4D9" }}>Relatório pré-consulta</p>
-              <p className="text-xs mt-1 leading-relaxed" style={{ color: "#9A9688" }}>Resumo longitudinal para abrir a consulta com peso, exames, hábitos e pontos de atenção.</p>
+              <p className="text-xs mt-1 leading-relaxed" style={{ color: "#9A9688" }}>Próxima etapa: resumo longitudinal com peso, exames, hábitos e pontos de atenção revisáveis.</p>
             </div>
             <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
               <ShieldCheck size={18} style={{ color: "#52B788" }} />
@@ -286,6 +285,15 @@ export function DoctorDashboardClient({ initialInvite, patients, baseUrl }: Prop
             <p className="text-xs mt-2 leading-relaxed" style={{ color: "#9A9688" }}>
               Esta tela organiza e prioriza dados compartilhados pelo paciente. Qualquer score, insight ou conduta clínica deve ser revisado, editado ou recusado pelo médico antes de chegar ao paciente.
             </p>
+          </div>
+
+          <div className="rounded-3xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <h3 className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>Critério do radar</h3>
+            <div className="mt-3 space-y-2 text-xs" style={{ color: "#9A9688" }}>
+              <p><span style={{ color: "#F4A261" }}>Revisar:</span> críticos ou múltiplos biomarcadores alterados.</p>
+              <p><span style={{ color: "#F4A261" }}>Acompanhar:</span> sem exames, dado antigo ou alteração isolada.</p>
+              <p><span style={{ color: "#52B788" }}>Estável:</span> sem prioridade operacional imediata.</p>
+            </div>
           </div>
         </div>
       </div>
