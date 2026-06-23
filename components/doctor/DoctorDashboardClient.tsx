@@ -38,11 +38,6 @@ function getSignalStyle(signal: DoctorCockpitSignal) {
   return { background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" };
 }
 
-function formatDate(date: string | null) {
-  if (!date) return "Sem dado";
-  return new Date(date).toLocaleDateString("pt-BR");
-}
-
 function formatDaysWithoutData(days: number | null) {
   if (days === null) return "Sem dado";
   if (days === 0) return "Hoje";
