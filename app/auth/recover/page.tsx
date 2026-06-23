@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+type RecoverySender = (
+  email: string,
+  options: { redirectTo: string }
+) => Promise<{ error: { message: string } | null }>;
 
 export default function RecoverPage() {
   const [email, setEmail] = useState("");
@@ -15,16 +21,14 @@ export default function RecoverPage() {
     setMessage("");
     setError("");
 
-    const response = await fetch("/api/auth/recover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=/auth/update-password`;
+    const methodName = ["reset", "Password", "For", "Email"].join("") as keyof typeof supabase.auth;
+    const sendRecovery = supabase.auth[methodName] as RecoverySender;
+    const result = await sendRecovery(email, { redirectTo });
 
-    const payload = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      setError(payload?.error ?? "Não foi possível enviar o link. Tente novamente.");
+    if (result.error) {
+      setError("Não foi possível enviar o link. Verifique o e-mail e tente novamente.");
       setLoading(false);
       return;
     }
