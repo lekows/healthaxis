@@ -18,6 +18,15 @@ export interface AgentRunForReview {
   completed_at: string | null;
 }
 
+export interface AgentReviewQueueItem extends AgentRunForReview {
+  patient: {
+    id: string;
+    name: string;
+    dob: string | null;
+    sex: string | null;
+  } | null;
+}
+
 export async function getPatientAgentRunsForReview(
   patientId: string,
   limit = 10
@@ -38,6 +47,42 @@ export async function getPatientAgentRunsForReview(
   return (data ?? []) as AgentRunForReview[];
 }
 
+export async function getDoctorAgentReviewQueue(
+  decision: AgentHumanDecision | "all" = "pending",
+  limit = 50
+): Promise<AgentReviewQueueItem[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: links } = await supabase
+    .from("doctor_patient_links")
+    .select("patient_id")
+    .eq("doctor_id", user.id)
+    .is("revoked_at", null);
+
+  const patientIds = (links ?? []).map((link) => link.patient_id).filter(Boolean);
+  if (patientIds.length === 0) return [];
+
+  let query = supabase
+    .from("agent_runs")
+    .select("id, agent_name, patient_id, model_used, confidence_score, output_json, edited_output, human_decision, human_decision_by, human_decision_at, status, created_at, completed_at, patient:patient_id(id, name, dob, sex)")
+    .in("patient_id", patientIds)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(limit);
+
+  if (decision !== "all") query = query.eq("human_decision", decision);
+
+  const { data, error } = await query;
+  if (error) return [];
+
+  return (data ?? []).map((item) => ({
+    ...item,
+    patient: Array.isArray(item.patient) ? item.patient[0] ?? null : item.patient ?? null,
+  })) as AgentReviewQueueItem[];
+}
+
 export function getAgentReviewSummary(agentRun: AgentRunForReview) {
   const output = agentRun.edited_output ?? agentRun.output_json ?? {};
   const possibleSummary =
@@ -46,6 +91,7 @@ export function getAgentReviewSummary(agentRun: AgentRunForReview) {
     output.analysis_summary ??
     output.overview ??
     output.impression ??
+    output.reviewed_summary ??
     null;
 
   if (typeof possibleSummary === "string") return possibleSummary;
