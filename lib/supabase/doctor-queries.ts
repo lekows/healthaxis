@@ -26,6 +26,33 @@ export interface LinkedPatient {
   patient: { name: string };
 }
 
+export type DoctorCockpitSignal = "review" | "followup" | "stable";
+
+export interface DoctorCockpitPatient {
+  id: string;
+  doctor_id: string;
+  patient_id: string;
+  consent_at: string;
+  revoked_at: string | null;
+  patient: {
+    id: string;
+    name: string;
+    dob: string | null;
+    sex: string | null;
+  } | null;
+  signal: DoctorCockpitSignal;
+  signal_reason: string;
+  next_action: string;
+  days_linked: number;
+  total_biomarkers: number;
+  altered_biomarkers: number;
+  critical_biomarkers: number;
+  document_count: number;
+  latest_document_date: string | null;
+  latest_data_date: string | null;
+  days_since_latest_data: number | null;
+}
+
 export interface LinkedDoctor {
   id: string;
   doctor_id: string;
@@ -50,6 +77,77 @@ export interface SharedExamToken {
   revoked_at: string | null;
   created_at: string;
   doctor_id: string | null;
+}
+
+function daysSince(date: string | null) {
+  if (!date) return null;
+  const time = new Date(date).getTime();
+  if (Number.isNaN(time)) return null;
+  return Math.max(0, Math.floor((Date.now() - time) / 86400000));
+}
+
+function mostRecentDate(dates: Array<string | null | undefined>) {
+  const validDates = dates
+    .filter((date): date is string => Boolean(date))
+    .map((date) => new Date(date).getTime())
+    .filter((time) => !Number.isNaN(time));
+
+  if (validDates.length === 0) return null;
+  return new Date(Math.max(...validDates)).toISOString();
+}
+
+function classifyCockpitPatient(params: {
+  alteredBiomarkers: number;
+  criticalBiomarkers: number;
+  documentCount: number;
+  daysSinceLatestData: number | null;
+  daysLinked: number;
+}): Pick<DoctorCockpitPatient, "signal" | "signal_reason" | "next_action"> {
+  if (params.criticalBiomarkers > 0) {
+    return {
+      signal: "review",
+      signal_reason: "Biomarcadores críticos ou fora da faixa relevante",
+      next_action: "Revisar exame e contexto clínico",
+    };
+  }
+
+  if (params.alteredBiomarkers >= 3) {
+    return {
+      signal: "review",
+      signal_reason: "Múltiplos biomarcadores alterados",
+      next_action: "Revisar painel cardiometabólico",
+    };
+  }
+
+  if (params.documentCount === 0 && params.daysLinked > 7) {
+    return {
+      signal: "followup",
+      signal_reason: "Paciente vinculado sem documentos enviados",
+      next_action: "Orientar envio de exames ou dados iniciais",
+    };
+  }
+
+  if (params.daysSinceLatestData !== null && params.daysSinceLatestData > 90) {
+    return {
+      signal: "followup",
+      signal_reason: "Sem dados recentes há mais de 90 dias",
+      next_action: "Solicitar atualização antes da próxima consulta",
+    };
+  }
+
+  if (params.alteredBiomarkers > 0) {
+    return {
+      signal: "followup",
+      signal_reason: "Há biomarcadores para acompanhamento",
+      next_action: "Acompanhar tendência e evolução",
+    };
+  }
+
+  return {
+    signal: "stable",
+    signal_reason: "Sem prioridade operacional imediata",
+    next_action: "Manter acompanhamento longitudinal",
+  };
 }
 
 export async function getDoctorProfile(): Promise<DoctorProfile | null> {
@@ -101,6 +199,82 @@ export async function getLinkedPatients(): Promise<LinkedPatient[]> {
     .is("revoked_at", null)
     .order("consent_at", { ascending: false });
   return (data ?? []) as LinkedPatient[];
+}
+
+export async function getDoctorCockpitPatients(): Promise<DoctorCockpitPatient[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: links } = await supabase
+    .from("doctor_patient_links")
+    .select("id, doctor_id, patient_id, consent_at, revoked_at, patient:patient_id(id, name, dob, sex)")
+    .eq("doctor_id", user.id)
+    .is("revoked_at", null)
+    .order("consent_at", { ascending: false });
+
+  const linkedPatients = links ?? [];
+  const patientIds = linkedPatients.map((link) => link.patient_id).filter(Boolean);
+  if (patientIds.length === 0) return [];
+
+  const [biomarkersRes, documentsRes] = await Promise.all([
+    supabase
+      .from("biomarkers")
+      .select("id, user_id, status, last_date")
+      .in("user_id", patientIds),
+    supabase
+      .from("documents")
+      .select("id, user_id, date, created_at")
+      .in("user_id", patientIds)
+      .order("date", { ascending: false }),
+  ]);
+
+  const biomarkers = biomarkersRes.data ?? [];
+  const documents = documentsRes.data ?? [];
+  const nonOptimalStatuses = new Set(["critical", "high", "low", "attention"]);
+  const criticalStatuses = new Set(["critical", "high", "low"]);
+
+  const rows = linkedPatients.map((link) => {
+    const patientBiomarkers = biomarkers.filter((item) => item.user_id === link.patient_id);
+    const patientDocuments = documents.filter((item) => item.user_id === link.patient_id);
+    const alteredBiomarkers = patientBiomarkers.filter((item) => nonOptimalStatuses.has(item.status)).length;
+    const criticalBiomarkers = patientBiomarkers.filter((item) => criticalStatuses.has(item.status)).length;
+    const latestDocumentDate = mostRecentDate(patientDocuments.map((item) => item.date ?? item.created_at));
+    const latestBiomarkerDate = mostRecentDate(patientBiomarkers.map((item) => item.last_date));
+    const latestDataDate = mostRecentDate([latestDocumentDate, latestBiomarkerDate]);
+    const daysLinked = daysSince(link.consent_at) ?? 0;
+    const daysSinceLatestData = daysSince(latestDataDate);
+    const classification = classifyCockpitPatient({
+      alteredBiomarkers,
+      criticalBiomarkers,
+      documentCount: patientDocuments.length,
+      daysSinceLatestData,
+      daysLinked,
+    });
+
+    return {
+      ...link,
+      patient: Array.isArray(link.patient) ? link.patient[0] ?? null : link.patient ?? null,
+      signal: classification.signal,
+      signal_reason: classification.signal_reason,
+      next_action: classification.next_action,
+      days_linked: daysLinked,
+      total_biomarkers: patientBiomarkers.length,
+      altered_biomarkers: alteredBiomarkers,
+      critical_biomarkers: criticalBiomarkers,
+      document_count: patientDocuments.length,
+      latest_document_date: latestDocumentDate,
+      latest_data_date: latestDataDate,
+      days_since_latest_data: daysSinceLatestData,
+    } as DoctorCockpitPatient;
+  });
+
+  const signalOrder: Record<DoctorCockpitSignal, number> = { review: 0, followup: 1, stable: 2 };
+  return rows.sort((a, b) => {
+    const signalDiff = signalOrder[a.signal] - signalOrder[b.signal];
+    if (signalDiff !== 0) return signalDiff;
+    return (b.altered_biomarkers + b.critical_biomarkers) - (a.altered_biomarkers + a.critical_biomarkers);
+  });
 }
 
 export async function getLinkedDoctors(): Promise<LinkedDoctor[]> {
