@@ -101,9 +101,9 @@ const docIcons: Record<string, React.ElementType> = {
   "Exame de Imagem": Image
 };
 
-interface DocumentCardProps { title: string; type: string; date: string; lab: string; status: string; tags: string[]; }
+interface DocumentCardProps { title: string; type: string; date: string; lab: string; status: string; tags: string[]; source?: string | null; }
 
-export function RecentDocumentCard({ title, type, date, lab, status, tags }: DocumentCardProps) {
+export function RecentDocumentCard({ title, type, date, lab, status, tags, source }: DocumentCardProps) {
   const Icon = docIcons[type] ?? FileText;
   return (
     <HoverCard
@@ -125,6 +125,9 @@ export function RecentDocumentCard({ title, type, date, lab, status, tags }: Doc
         <p className="text-xs mt-0.5" style={{ color: "#5A5A50" }}>
           {lab ? `${lab} · ` : ""}{new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
         </p>
+        {source === "doctor_upload" && (
+          <p className="text-xs mt-1" style={{ color: "#F4A261" }}>Enviado pelo medico</p>
+        )}
         <div className="flex gap-1 mt-2 flex-wrap">
           {tags.slice(0, 2).map(t => (
             <span key={t} className="text-xs px-2 py-0.5 rounded-full"
