@@ -28,6 +28,7 @@ type DocItem = {
   id: string; title: string; type: string; lab: string | null;
   date: string; status: string; tags: string[] | null;
   file_url?: string | null;
+  source?: string | null;
 };
 
 interface Props {
@@ -386,6 +387,9 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
                           <div className="flex-1 min-w-0">
                             <p className="text-base font-semibold leading-snug" style={{ color: "#F4F0E6" }}>{doc.title}</p>
                             <p className="text-sm mt-1" style={{ color: "#D8D2C4" }}>{doc.type}</p>
+                            {doc.source === "doctor_upload" && (
+                              <p className="text-xs mt-1" style={{ color: "#F4A261" }}>Enviado pelo médico</p>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
