@@ -104,6 +104,26 @@ export async function addHabit(planId: string, patientId: string, input: { title
   return { error: null };
 }
 
+// Check-in do paciente (face do paciente). RLS exige patient_id = auth.uid() e
+// que o paciente seja o dono do plano.
+export async function addPatientCheckIn(planId: string, note: string, adherence: number | null): Promise<Result> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada. Entre novamente." };
+
+  const adh = adherence === null || Number.isNaN(adherence) ? null : Math.max(0, Math.min(100, Math.round(adherence)));
+  const { error } = await supabase.from("care_check_ins").insert({
+    care_plan_id: planId,
+    patient_id: user.id,
+    note: note.trim() || null,
+    adherence: adh,
+  });
+  if (error) return { error: "Não foi possível registrar o check-in." };
+  await audit(planId, user.id, "check_in", { adherence: adh });
+  revalidatePath("/care-plan");
+  return { error: null };
+}
+
 export async function toggleHabit(habitId: string, planId: string, patientId: string, active: boolean): Promise<Result> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

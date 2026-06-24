@@ -72,3 +72,13 @@ export async function getCarePlan(patientId: string): Promise<CarePlan | null> {
     return null;
   }
 }
+
+// Plano de cuidado do próprio usuário autenticado (face do paciente). A RLS
+// (care_plans_patient_read + can_read_plan para patient_id = auth.uid()) garante
+// que só o dono lê.
+export async function getMyCarePlan(): Promise<CarePlan | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  return getCarePlan(user.id);
+}
