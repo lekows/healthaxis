@@ -9,8 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 type OAuthProvider = Extract<Provider, "google" | "azure">;
 
 const oauthProviders: { provider: OAuthProvider; label: string }[] = [
-  { provider: "google", label: "Continuar com Google" },
-  { provider: "azure", label: "Continuar com Microsoft" },
+  { provider: "google", label: "Google" },
+  { provider: "azure", label: "Microsoft" },
 ];
 
 function translateAuthError(msg: string): string {
@@ -52,6 +52,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -83,7 +84,9 @@ export default function LoginPage() {
     router.replace("/auth/post-login");
   }
 
-  async function handleMagicLink() {
+  async function handleMagicLink(e?: React.FormEvent) {
+    e?.preventDefault();
+
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
       setError("Informe seu e-mail para receber o link de acesso.");
@@ -134,96 +137,113 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0D0D0B" }}>
-      <div className="w-full max-w-md px-8 py-10 rounded-2xl border border-white/10" style={{ background: "#161614" }}>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#0D0D0B" }}>
+      <div className="w-full max-w-md rounded-3xl border border-white/10 px-6 py-8 shadow-2xl sm:px-8" style={{ background: "#161614" }}>
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-white tracking-tight">HealthAxis</h1>
-          <p className="text-sm text-white/40 mt-1">Acesse ou crie sua conta</p>
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 text-sm font-semibold text-black" style={{ background: "#C8F04A" }}>
+            HA
+          </div>
+          <h1 className="text-2xl font-semibold text-white tracking-tight">Entrar no HealthAxis</h1>
+          <p className="text-sm text-white/45 mt-2">
+            Use seu e-mail para receber um link seguro. Não precisa criar senha.
+          </p>
         </div>
 
-        <div className="space-y-3">
+        <form onSubmit={showPasswordLogin ? handleLogin : handleMagicLink} className="space-y-4">
+          <div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">E-mail</label>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white text-sm outline-none focus:border-white/30 transition-colors"
+              placeholder="seu@email.com"
+            />
+          </div>
+
+          {showPasswordLogin && (
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider">Senha</label>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white text-sm outline-none focus:border-white/30 transition-colors"
+                placeholder="Digite sua senha"
+              />
+              <div className="mt-2 text-right">
+                <Link href="/auth/recover" className="text-xs text-white/50 hover:text-white transition-colors">
+                  Esqueci minha senha
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {magicLinkSent && (
+            <div className="rounded-xl border px-4 py-3 text-sm" style={{ color: "#52B788", borderColor: "rgba(82,183,136,0.2)", background: "rgba(82,183,136,0.08)" }}>
+              Enviamos um link para <span className="font-medium">{email.trim()}</span>. Verifique sua caixa de entrada.
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-300">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={showPasswordLogin ? passwordLoading : magicLinkLoading}
+            className="w-full py-3.5 rounded-xl text-sm font-semibold text-black transition-opacity disabled:opacity-50"
+            style={{ background: "#C8F04A" }}
+          >
+            {showPasswordLogin
+              ? passwordLoading ? "Entrando..." : "Entrar com senha"
+              : magicLinkLoading ? "Enviando..." : "Receber link de acesso"}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowPasswordLogin((current) => !current);
+            setError("");
+            setMagicLinkSent(false);
+          }}
+          className="mt-3 w-full rounded-xl border border-white/10 py-3 text-sm font-medium text-white/65 transition-colors hover:bg-white/5 hover:text-white"
+        >
+          {showPasswordLogin ? "Usar link de acesso sem senha" : "Prefiro entrar com senha"}
+        </button>
+
+        <div className="my-6 relative flex items-center">
+          <div className="flex-1 border-t border-white/10" />
+          <span className="mx-3 text-xs text-white/30">ou continue com</span>
+          <div className="flex-1 border-t border-white/10" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           {oauthProviders.map(({ provider, label }) => (
             <button
               key={provider}
               type="button"
               onClick={() => handleOAuth(provider)}
               disabled={Boolean(oauthLoading)}
-              className="w-full py-3 rounded-lg text-sm font-medium border border-white/10 transition-colors flex items-center justify-center gap-2.5 hover:bg-white/5 disabled:opacity-50"
-              style={{ color: "rgba(255,255,255,0.7)" }}
+              className="py-3 rounded-xl text-sm font-medium border border-white/10 transition-colors flex items-center justify-center gap-2 hover:bg-white/5 disabled:opacity-50"
+              style={{ color: "rgba(255,255,255,0.72)" }}
             >
               <OAuthIcon provider={provider} />
-              {oauthLoading === provider ? "Redirecionando..." : label}
+              {oauthLoading === provider ? "Abrindo..." : label}
             </button>
           ))}
         </div>
 
-        <div className="mt-5 relative flex items-center">
-          <div className="flex-1 border-t border-white/10" />
-          <span className="mx-3 text-xs text-white/30">ou use seu e-mail</span>
-          <div className="flex-1 border-t border-white/10" />
-        </div>
-
-        <form onSubmit={handleLogin} className="mt-5 space-y-4">
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider">E-mail</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white text-sm outline-none focus:border-white/30 transition-colors"
-              placeholder="seu@email.com"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs text-white/50 uppercase tracking-wider">Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white text-sm outline-none focus:border-white/30 transition-colors"
-              placeholder="Opcional se usar link de acesso"
-            />
-            <div className="mt-2 text-right">
-              <Link href="/auth/recover" className="text-xs text-white/50 hover:text-white transition-colors">
-                Esqueci minha senha
-              </Link>
-            </div>
-          </div>
-
-          {magicLinkSent && (
-            <p className="text-sm text-center" style={{ color: "#52B788" }}>
-              Enviamos um link de acesso para {email.trim()}. Verifique sua caixa de entrada.
-            </p>
-          )}
-
-          {error && (
-            <p className="text-red-400 text-sm text-center">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={passwordLoading || !password}
-            className="w-full py-3 rounded-lg text-sm font-medium text-black transition-opacity disabled:opacity-50"
-            style={{ background: "#C8F04A" }}
-          >
-            {passwordLoading ? "Entrando..." : "Entrar com senha"}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleMagicLink}
-            disabled={magicLinkLoading}
-            className="w-full py-3 rounded-lg text-sm font-medium border border-white/10 text-white/70 transition-colors hover:bg-white/5 disabled:opacity-50"
-          >
-            {magicLinkLoading ? "Enviando..." : "Entrar sem senha por e-mail"}
-          </button>
-        </form>
-
         <p className="mt-6 text-center text-sm text-white/40">
-          Novo no HealthAxis?{" "}
-          <Link href="/auth/signup" className="text-white/70 hover:text-white transition-colors">
+          Primeira vez por aqui?{" "}
+          <Link href="/auth/signup" className="font-medium text-white/75 hover:text-white transition-colors">
             Criar conta
           </Link>
         </p>
