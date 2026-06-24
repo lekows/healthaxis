@@ -286,6 +286,139 @@ export async function getDoctorCockpitPatients(): Promise<DoctorCockpitPatient[]
   });
 }
 
+export interface ExamChange {
+  slug: string;
+  name: string;
+  unit: string | null;
+  value: number;
+  previous: number | null;
+  delta: number | null;
+  status: string;
+}
+
+export interface DoctorNewExam {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  title: string;
+  lab: string | null;
+  date: string | null;
+  measured_count: number;
+  altered_count: number;
+  changes: ExamChange[];
+  reviewed: boolean;
+  is_new: boolean;
+}
+
+const EXAM_NON_OPTIMAL = new Set(["critical", "high", "low", "attention"]);
+
+// Exames novos da carteira: documentos recentes dos pacientes vinculados, com
+// "o que mudou" (delta vs. valor anterior, via biomarker_history.document_id) e
+// status de revisão (proxy: houve panel_view do médico após a data do exame).
+export async function getDoctorNewExams(limit = 50): Promise<DoctorNewExam[]> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: links } = await supabase
+      .from("doctor_patient_links")
+      .select("patient_id, patient:patient_id(id, name)")
+      .eq("doctor_id", user.id)
+      .is("revoked_at", null);
+    const linked = links ?? [];
+    const patientIds = linked.map((l) => l.patient_id).filter(Boolean);
+    if (patientIds.length === 0) return [];
+
+    const nameById = new Map<string, string>();
+    linked.forEach((l) => {
+      const p = Array.isArray(l.patient) ? l.patient[0] : l.patient;
+      if (p) nameById.set(l.patient_id, p.name);
+    });
+
+    const [docsRes, biomarkersRes, accessRes, allHistRes] = await Promise.all([
+      supabase.from("documents").select("id, user_id, title, lab, date").in("user_id", patientIds).order("date", { ascending: false }).limit(limit),
+      supabase.from("biomarkers").select("user_id, slug, name, unit, status").in("user_id", patientIds),
+      supabase.from("doctor_access_logs").select("patient_id, access_type, created_at").eq("doctor_id", user.id).eq("access_type", "panel_view"),
+      supabase.from("biomarker_history").select("user_id, biomarker_slug, value, recorded_at, document_id").in("user_id", patientIds).order("recorded_at", { ascending: true }),
+    ]);
+
+    const docs = docsRes.data ?? [];
+    const biomarkers = biomarkersRes.data ?? [];
+    const accessLogs = accessRes.data ?? [];
+    const history = allHistRes.data ?? [];
+
+    const bioByKey = new Map<string, { name: string; unit: string | null; status: string }>();
+    biomarkers.forEach((b) => bioByKey.set(`${b.user_id}:${b.slug}`, { name: b.name, unit: b.unit, status: b.status }));
+
+    const histByKey = new Map<string, { value: number; recorded_at: string }[]>();
+    const measuredByDoc = new Map<string, { user_id: string; slug: string; value: number; recorded_at: string }[]>();
+    history.forEach((h) => {
+      const key = `${h.user_id}:${h.biomarker_slug}`;
+      const series = histByKey.get(key) ?? [];
+      series.push({ value: Number(h.value), recorded_at: h.recorded_at });
+      histByKey.set(key, series);
+      if (h.document_id) {
+        const arr = measuredByDoc.get(h.document_id) ?? [];
+        arr.push({ user_id: h.user_id, slug: h.biomarker_slug, value: Number(h.value), recorded_at: h.recorded_at });
+        measuredByDoc.set(h.document_id, arr);
+      }
+    });
+
+    return docs.map((doc) => {
+      const measured = measuredByDoc.get(doc.id) ?? [];
+      const changes: ExamChange[] = measured.map((m) => {
+        const meta = bioByKey.get(`${m.user_id}:${m.slug}`);
+        const series = histByKey.get(`${m.user_id}:${m.slug}`) ?? [];
+        let previous: number | null = null;
+        for (const point of series) {
+          if (new Date(point.recorded_at).getTime() < new Date(m.recorded_at).getTime()) previous = point.value;
+          else break;
+        }
+        return {
+          slug: m.slug,
+          name: meta?.name ?? m.slug,
+          unit: meta?.unit ?? null,
+          value: m.value,
+          previous,
+          delta: previous !== null ? Number((m.value - previous).toFixed(2)) : null,
+          status: meta?.status ?? "optimal",
+        };
+      });
+
+      changes.sort((a, b) => {
+        const aAlt = EXAM_NON_OPTIMAL.has(a.status) ? 1 : 0;
+        const bAlt = EXAM_NON_OPTIMAL.has(b.status) ? 1 : 0;
+        if (aAlt !== bAlt) return bAlt - aAlt;
+        const aPct = a.previous ? Math.abs((a.delta ?? 0) / a.previous) : 0;
+        const bPct = b.previous ? Math.abs((b.delta ?? 0) / b.previous) : 0;
+        return bPct - aPct;
+      });
+
+      const docTime = doc.date ? new Date(doc.date).getTime() : 0;
+      const reviewed = accessLogs.some((l) => l.patient_id === doc.user_id && l.created_at && new Date(l.created_at).getTime() >= docTime);
+      const dAge = daysSince(doc.date);
+
+      return {
+        id: doc.id,
+        patient_id: doc.user_id,
+        patient_name: nameById.get(doc.user_id) ?? "Paciente",
+        title: doc.title,
+        lab: doc.lab,
+        date: doc.date,
+        measured_count: measured.length,
+        altered_count: changes.filter((c) => EXAM_NON_OPTIMAL.has(c.status)).length,
+        changes: changes.slice(0, 4),
+        reviewed,
+        is_new: dAge !== null && dAge <= 14,
+      };
+    });
+  } catch (e) {
+    console.error("getDoctorNewExams failed:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
 export async function getLinkedDoctors(): Promise<LinkedDoctor[]> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

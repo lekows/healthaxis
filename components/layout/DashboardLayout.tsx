@@ -34,6 +34,7 @@ const doctorNav: NavItem[] = [
   { href: "/doctor", label: "Cockpit", icon: Stethoscope },
   { href: "/doctor/patients", label: "Pacientes", icon: Users },
   { href: "/doctor/reviews", label: "Revisão IA", icon: BrainCircuit },
+  { href: "/doctor/exams", label: "Exames novos", icon: FlaskConical },
   { href: "/profile", label: "Configurações", icon: Settings }
 ];
 
