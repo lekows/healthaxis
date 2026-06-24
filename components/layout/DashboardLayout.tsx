@@ -195,6 +195,16 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
             </div>
             <span className="font-semibold text-sm" style={{ color: "#E8E4D9" }}>HealthAxis</span>
           </Link>
+          <form action={signOut}>
+            <button
+              type="submit"
+              aria-label="Sair"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+              style={{ color: "#C1440E", background: "rgba(193,68,14,0.1)", border: "1px solid rgba(193,68,14,0.2)" }}
+            >
+              <LogOut size={13} /> Sair
+            </button>
+          </form>
         </motion.header>
 
         {/* Page transition */}
