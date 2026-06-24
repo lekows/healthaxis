@@ -191,7 +191,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4 text-sm">
                 <div>
                   <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>Prioridade</p>
-                  <p className="mt-1" style={{ color: "#E8E4D9" }}>{outOfRange.length > 0 ? "Revisar biomarcadores fora do intervalo" : alteredCount > 0 ? "Acompanhar alterações" : "Sem alerta [...]"}
+                  <p className="mt-1" style={{ color: "#E8E4D9" }}>{outOfRange.length > 0 ? "Revisar biomarcadores fora do intervalo" : alteredCount > 0 ? "Acompanhar alterações" : "Sem alerta laboratorial imediato"}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>Último documento</p>
@@ -199,7 +199,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>IA revisável</p>
-                  <p className="mt-1" style={{ color: "#E8E4D9" }}>{agentRuns.length > 0 ? `${agentRuns.length} análise(s), ${pendingAgentRuns.length} pendente(s)` : "Nenhuma análise metabólic[...]"}
+                  <p className="mt-1" style={{ color: "#E8E4D9" }}>{agentRuns.length > 0 ? `${agentRuns.length} análise(s), ${pendingAgentRuns.length} pendente(s)` : "Nenhuma análise metabólica concluída"}</p>
                 </div>
               </div>
             </section>
@@ -269,7 +269,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
               <div className="space-y-3">
                 {timelineEvents.map((e, i) => (
                   <div key={i} className="flex gap-3 p-4 rounded-2xl" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: e.kind === "ai" ? "rgba(244,162,97,0.1)" : "rgba(82,183,136,0.1)", border: "1px solid rgba(255,255,255,0.03)" }}>
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: e.kind === "ai" ? "rgba(244,162,97,0.1)" : "rgba(82,183,136,0.1)", border: `1px solid ${e.kind === "ai" ? "rgba(244,162,97,0.22)" : "rgba(82,183,136,0.2)"}` }}>
                       {e.kind === "ai" ? <BrainCircuit size={15} style={{ color: "#F4A261" }} /> : <FlaskConical size={15} style={{ color: "#52B788" }} />}
                     </div>
                     <div className="min-w-0">

@@ -388,7 +388,7 @@ export function ExamsTabsClient({ biomarkers, historyBySlug, categories, documen
                             <p className="text-base font-semibold leading-snug" style={{ color: "#F4F0E6" }}>{doc.title}</p>
                             <p className="text-sm mt-1" style={{ color: "#D8D2C4" }}>{doc.type}</p>
                             {doc.source === "doctor_upload" && (
-                              <p className="text-xs mt-1" style={{ color: "#F4A261" }}>Enviado pelo medico</p>
+                              <p className="text-xs mt-1" style={{ color: "#F4A261" }}>Enviado pelo médico</p>
                             )}
                           </div>
 

@@ -19,12 +19,19 @@ export default function SetupPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/auth/login"); return; }
+
       setUserId(user.id);
+
       const displayName =
         (user.user_metadata?.full_name as string | undefined) ??
         (user.user_metadata?.name as string | undefined) ??
         "";
+      const metadataRole = user.user_metadata?.role;
+      const metadataCrm = user.user_metadata?.crm;
+
       setName(displayName);
+      if (metadataRole === "patient" || metadataRole === "doctor") setRole(metadataRole);
+      if (typeof metadataCrm === "string") setCrm(metadataCrm);
       setInitializing(false);
     }
     init();
