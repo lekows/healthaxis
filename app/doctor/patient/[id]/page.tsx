@@ -1,13 +1,15 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers, getPatientLatestMetabolicAnalysis, logDoctorAccess } from "@/lib/supabase/doctor-queries";
+import { getAgentReviewHighlights, getAgentReviewSummary, getPatientAgentRunsForReview } from "@/lib/supabase/agent-review-queries";
 import { WatchedBiomarkerToggle } from "@/components/doctor/WatchedBiomarkerToggle";
 import { ConsultationPrepClient } from "@/components/doctor/ConsultationPrepClient";
 import { MetabolicInsightsCard } from "@/components/overview/MetabolicInsightsCard";
+import { AgentReviewCard } from "@/components/doctor/AgentReviewCard";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
 import { HealthMetricCard } from "@/components/dashboard/MetricCards";
-import { AlertTriangle, FileText, FlaskConical, ArrowLeft, ShieldAlert, User } from "lucide-react";
+import { AlertTriangle, BarChart3, FileText, FlaskConical, ArrowLeft, ShieldAlert, ShieldCheck, Stethoscope } from "lucide-react";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -29,15 +31,21 @@ function age(dob: string | null): string {
   return Number.isFinite(years) ? `${years} anos` : "";
 }
 
+function formatDate(date: string | null | undefined) {
+  if (!date) return "Sem data";
+  return new Date(date).toLocaleDateString("pt-BR");
+}
+
 export default async function DoctorPatientPage({ params }: Props) {
   const { id } = await params;
 
-  const [profile, doctorProfile, panel, watched, metabolicRun] = await Promise.all([
+  const [profile, doctorProfile, panel, watched, metabolicRun, agentRuns] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
     getLinkedPatientPanel(id),
     getWatchedBiomarkers(id),
     getPatientLatestMetabolicAnalysis(id),
+    getPatientAgentRunsForReview(id),
   ]);
   const watchedSlugs = new Set(watched.map((w) => w.slug));
 
@@ -45,6 +53,7 @@ export default async function DoctorPatientPage({ params }: Props) {
   // Sem vínculo ativo → não autorizado.
   if (!panel) notFound();
 
+  // Auditoria do acesso do médico ao painel do paciente (fora do caminho crítico).
   void logDoctorAccess(doctorProfile.id, id, "panel_view");
 
   const sorted = [...panel.biomarkers].sort(
@@ -54,6 +63,9 @@ export default async function DoctorPatientPage({ params }: Props) {
   const attention = sorted.filter((b) => b.status === "attention");
   const normal = sorted.filter((b) => b.status === "optimal");
   const normalCategories = [...new Set(normal.map((b) => b.category))];
+  const alteredCount = outOfRange.length + attention.length;
+  const pendingAgentRuns = agentRuns.filter((run) => run.human_decision === "pending");
+  const latestDocument = panel.documents[0] ?? null;
 
   const historyBySlug = panel.history.reduce<Record<string, { date: string; value: number }[]>>((acc, h) => {
     (acc[h.biomarker_slug] ??= []).push({ date: h.date_label, value: Number(h.value) });
@@ -88,25 +100,100 @@ export default async function DoctorPatientPage({ params }: Props) {
 
   return (
     <DashboardLayout userName={profile?.name} isDoctor={!!doctorProfile}>
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
+      <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-8">
 
-        <Link href="/doctor" className="inline-flex items-center gap-2 text-sm transition-all hover:opacity-80" style={{ color: "#9A9688" }}>
-          <ArrowLeft size={16} /> Voltar ao painel
+        <Link href="/doctor" className="inline-flex items-center gap-2 text-xs font-semibold transition-opacity hover:opacity-80" style={{ color: "#52B788" }}>
+          <ArrowLeft size={14} /> Voltar ao cockpit médico
         </Link>
 
-        {/* Cabeçalho do paciente */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)" }}>
-            <User size={18} style={{ color: "#52B788" }} />
+        {/* Cabeçalho do paciente + ação de relatório */}
+        <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)" }}>
+              <Stethoscope size={19} style={{ color: "#52B788" }} />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-widest font-medium" style={{ color: "#5A5A50" }}>Patient 360</p>
+              <h1 className="text-2xl font-bold mt-1" style={{ color: "#E8E4D9" }}>{patientName}</h1>
+              <p className="text-sm mt-1" style={{ color: "#9A9688" }}>
+                {[ageLabel, panel.patient?.sex].filter(Boolean).join(" · ") || "Paciente vinculado"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: "#E8E4D9" }}>{patientName}</h1>
-            <p className="text-sm mt-0.5" style={{ color: "#9A9688" }}>
-              {[ageLabel, panel.patient?.sex].filter(Boolean).join(" · ") || "Paciente vinculado"}
-            </p>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link href={`/doctor/patient/${id}/report`} className="px-4 py-2.5 rounded-2xl text-sm font-semibold transition-opacity hover:opacity-90 text-center" style={{ background: "#52B788", color: "#0D0D0B" }}>
+              Gerar relatório pré-consulta
+            </Link>
+            <div className="px-4 py-2.5 rounded-2xl text-xs leading-relaxed max-w-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "#9A9688" }}>
+              Vínculo ativo iniciado pelo paciente. Esta tela organiza dados compartilhados e não emite conduta autônoma.
+            </div>
           </div>
         </div>
+
+        {/* Indicadores rápidos */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <BarChart3 size={18} style={{ color: "#52B788" }} />
+            <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{panel.biomarkers.length}</p>
+            <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Biomarcadores disponíveis</p>
+          </div>
+          <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <AlertTriangle size={18} style={{ color: "#F4A261" }} />
+            <p className="text-3xl font-bold mt-4" style={{ color: outOfRange.length > 0 ? "#F4A261" : "#E8E4D9" }}>{alteredCount}</p>
+            <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Fora da faixa/atenção</p>
+          </div>
+          <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <FileText size={18} style={{ color: "#52B788" }} />
+            <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{panel.documents.length}</p>
+            <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Documentos recentes</p>
+          </div>
+          <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <ShieldCheck size={18} style={{ color: "#52B788" }} />
+            <p className="text-3xl font-bold mt-4" style={{ color: pendingAgentRuns.length > 0 ? "#F4A261" : "#E8E4D9" }}>{pendingAgentRuns.length}</p>
+            <p className="text-xs mt-1" style={{ color: "#9A9688" }}>IA pendente de revisão</p>
+          </div>
+        </div>
+
+        {/* Resumo executivo */}
+        <section className="rounded-3xl p-5 lg:p-6" style={{ background: "rgba(244,162,97,0.06)", border: "1px solid rgba(244,162,97,0.18)" }}>
+          <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2" style={{ color: "#F4A261" }}>
+            <FileText size={14} /> Resumo executivo para revisão médica
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4 text-sm">
+            <div>
+              <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>Prioridade</p>
+              <p className="mt-1" style={{ color: "#E8E4D9" }}>{outOfRange.length > 0 ? "Revisar biomarcadores fora do intervalo" : alteredCount > 0 ? "Acompanhar alterações" : "Sem alerta laboratorial imediato"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>Último documento</p>
+              <p className="mt-1" style={{ color: "#E8E4D9" }}>{latestDocument ? `${latestDocument.title} · ${formatDate(latestDocument.date)}` : "Nenhum documento recente"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>IA revisável</p>
+              <p className="mt-1" style={{ color: "#E8E4D9" }}>{agentRuns.length > 0 ? `${agentRuns.length} análise(s), ${pendingAgentRuns.length} pendente(s)` : "Nenhuma análise metabólica concluída"}</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Revisão humana de IA */}
+        {agentRuns.length > 0 && (
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: "#9A9688" }}>Revisão humana de IA</h2>
+              <p className="text-xs mt-1" style={{ color: "#5A5A50" }}>Aceite, edite ou rejeite interpretações automatizadas antes de qualquer uso clínico.</p>
+            </div>
+            {agentRuns.map((agentRun) => (
+              <AgentReviewCard
+                key={agentRun.id}
+                agentRun={agentRun}
+                patientId={id}
+                summary={getAgentReviewSummary(agentRun)}
+                highlights={getAgentReviewHighlights(agentRun)}
+              />
+            ))}
+          </section>
+        )}
 
         {/* Preparação de consulta */}
         <ConsultationPrepClient patientId={id} />
@@ -175,7 +262,7 @@ export default async function DoctorPatientPage({ params }: Props) {
           </div>
         )}
 
-        {/* Dentro do intervalo — agrupado por categoria, sempre visível */}
+        {/* Dentro do intervalo — agrupado por categoria */}
         {normal.length > 0 && (
           <div className="space-y-6">
             <h2 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2" style={{ color: "#9A9688" }}>

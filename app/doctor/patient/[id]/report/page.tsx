@@ -51,15 +51,15 @@ const statusOrder: Record<string, number> = {
 export default async function PreConsultationReportPage({
   params,
 }: {
-  params: Promise<{ patientId: string }>;
+  params: Promise<{ id: string }>;
 }) {
-  const { patientId } = await params;
+  const { id } = await params;
 
   const [profile, doctorProfile, panel, latestAnalysis] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
-    getLinkedPatientPanel(patientId),
-    getPatientLatestMetabolicAnalysis(patientId),
+    getLinkedPatientPanel(id),
+    getPatientLatestMetabolicAnalysis(id),
   ]);
 
   if (!doctorProfile) redirect("/doctor/setup");
