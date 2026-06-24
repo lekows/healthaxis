@@ -52,7 +52,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
+  const [showPasswordLogin, setShowPasswordLogin] = useState(true);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [magicLinkLoading, setMagicLinkLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -145,7 +145,7 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-semibold text-white tracking-tight">Entrar no HealthAxis</h1>
           <p className="text-sm text-white/45 mt-2">
-            Use seu e-mail para receber um link seguro. Não precisa criar senha.
+            Entre com seu e-mail e senha, ou use um link de acesso.
           </p>
         </div>
 
