@@ -1,12 +1,17 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile, getDoctorCockpitPatients } from "@/lib/supabase/doctor-queries";
-import { PatientPortfolioClient, PORTFOLIO_FILTERS, type PortfolioFilter } from "@/components/doctor/PatientPortfolioClient";
+import { PatientPortfolioClient, type PortfolioFilter } from "@/components/doctor/PatientPortfolioClient";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { Users } from "lucide-react";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
+
+// Definido localmente (server): importar um VALOR de um módulo "use client" para
+// um Server Component vira uma client-reference (proxy), e usá-lo como array
+// lança em runtime. O tipo acima é apagado na compilação, então é seguro.
+const VALID_FILTERS: PortfolioFilter[] = ["all", "review", "followup", "pending_ai", "new_exam", "stale"];
 
 export default async function DoctorPatientsPage({
   searchParams,
@@ -22,7 +27,7 @@ export default async function DoctorPatientsPage({
   if (!doctorProfile) redirect("/doctor/setup");
 
   const requested = (await searchParams)?.filter;
-  const initialFilter: PortfolioFilter = PORTFOLIO_FILTERS.includes(requested as PortfolioFilter)
+  const initialFilter: PortfolioFilter = VALID_FILTERS.includes(requested as PortfolioFilter)
     ? (requested as PortfolioFilter)
     : "all";
 
