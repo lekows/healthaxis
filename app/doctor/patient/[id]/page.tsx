@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile, getLinkedPatientPanel, getWatchedBiomarkers, getPatientLatestMetabolicAnalysis, logDoctorAccess } from "@/lib/supabase/doctor-queries";
 import { getAgentReviewHighlights, getAgentReviewSummary, getPatientAgentRunsForReview } from "@/lib/supabase/agent-review-queries";
+import { getCarePlan } from "@/lib/supabase/care-plan-queries";
 import { WatchedBiomarkerToggle } from "@/components/doctor/WatchedBiomarkerToggle";
 import { ConsultationPrepClient } from "@/components/doctor/ConsultationPrepClient";
 import { MetabolicInsightsCard } from "@/components/overview/MetabolicInsightsCard";
@@ -54,13 +55,14 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
   const requestedTab = (await searchParams)?.tab;
   const tab: TabValue = TABS.some((t) => t.value === requestedTab) ? (requestedTab as TabValue) : "resumo";
 
-  const [profile, doctorProfile, panel, watched, metabolicRun, agentRuns] = await Promise.all([
+  const [profile, doctorProfile, panel, watched, metabolicRun, agentRuns, carePlan] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
     getLinkedPatientPanel(id),
     getWatchedBiomarkers(id),
     getPatientLatestMetabolicAnalysis(id),
     getPatientAgentRunsForReview(id),
+    getCarePlan(id),
   ]);
   const watchedSlugs = new Set(watched.map((w) => w.slug));
 
@@ -291,18 +293,73 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
           </div>
         )}
 
-        {/* PLANO (Fase 6 — em construção) */}
+        {/* PLANO (Fase 6) */}
         {tab === "plano" && (
-          <div className="rounded-3xl p-8 text-center" style={{ background: "#141412", border: "1px dashed rgba(255,255,255,0.12)" }}>
-            <ClipboardList size={28} className="mx-auto" style={{ color: "#5A5A50" }} />
-            <p className="text-sm font-semibold mt-3" style={{ color: "#E8E4D9" }}>Plano de cuidado</p>
-            <p className="text-xs mt-1 max-w-md mx-auto" style={{ color: "#9A9688" }}>
-              Metas, hábitos prescritos pelo médico, check-ins e adesão. Em construção — exige modelagem de dados própria com trilha de auditoria e médico no comando.
-            </p>
-            <div className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" }}>
-              <CalendarClock size={12} /> Próxima grande etapa
+          carePlan ? (
+            <div className="space-y-6">
+              <div className="rounded-3xl p-5 lg:p-6" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h2 className="text-sm font-semibold flex items-center gap-2" style={{ color: "#E8E4D9" }}>
+                    <ClipboardList size={15} style={{ color: "#52B788" }} /> {carePlan.title}
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" }}>{carePlan.status}</span>
+                </div>
+                {carePlan.summary && <p className="text-xs mt-2 leading-relaxed" style={{ color: "#9A9688" }}>{carePlan.summary}</p>}
+                {carePlan.latest_check_in && (
+                  <p className="text-xs mt-3" style={{ color: "#5A5A50" }}>
+                    Último check-in: {formatDate(carePlan.latest_check_in.created_at)}
+                    {carePlan.latest_check_in.adherence !== null ? ` · adesão ${carePlan.latest_check_in.adherence}%` : ""}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: "#9A9688" }}>Metas ({carePlan.goals.length})</h3>
+                {carePlan.goals.length === 0 ? (
+                  <p className="text-xs" style={{ color: "#5A5A50" }}>Nenhuma meta definida.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {carePlan.goals.map((g) => (
+                      <div key={g.id} className="flex items-center justify-between gap-3 p-4 rounded-2xl" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                        <div>
+                          <p className="text-sm" style={{ color: "#E8E4D9" }}>{g.description}</p>
+                          <p className="text-xs mt-0.5" style={{ color: "#5A5A50" }}>{[g.metric, g.target, g.due_date ? `até ${formatDate(g.due_date)}` : null].filter(Boolean).join(" · ")}</p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "#9A9688" }}>{g.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: "#9A9688" }}>Hábitos prescritos ({carePlan.habits.length})</h3>
+                {carePlan.habits.length === 0 ? (
+                  <p className="text-xs" style={{ color: "#5A5A50" }}>Nenhum hábito prescrito.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {carePlan.habits.map((h) => (
+                      <div key={h.id} className="p-4 rounded-2xl" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                        <p className="text-sm" style={{ color: "#E8E4D9" }}>{h.title}</p>
+                        <p className="text-xs mt-0.5" style={{ color: "#5A5A50" }}>{[h.frequency, h.notes].filter(Boolean).join(" · ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-3xl p-8 text-center" style={{ background: "#141412", border: "1px dashed rgba(255,255,255,0.12)" }}>
+              <ClipboardList size={28} className="mx-auto" style={{ color: "#5A5A50" }} />
+              <p className="text-sm font-semibold mt-3" style={{ color: "#E8E4D9" }}>Sem plano de cuidado ativo</p>
+              <p className="text-xs mt-1 max-w-md mx-auto" style={{ color: "#9A9688" }}>
+                Metas, hábitos prescritos pelo médico, check-ins e adesão. O editor de criação entra após aplicar a migração <code>care_plans</code> no Supabase, com trilha de auditoria e médico no comando.
+              </p>
+              <div className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-full text-[11px] font-semibold" style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" }}>
+                <CalendarClock size={12} /> Próxima grande etapa
+              </div>
+            </div>
+          )
         )}
 
         {/* RELATÓRIOS */}
