@@ -8,6 +8,7 @@ import { WatchedBiomarkerToggle } from "@/components/doctor/WatchedBiomarkerTogg
 import { ConsultationPrepClient } from "@/components/doctor/ConsultationPrepClient";
 import { MetabolicInsightsCard } from "@/components/overview/MetabolicInsightsCard";
 import { AgentReviewCard } from "@/components/doctor/AgentReviewCard";
+import { DoctorPatientUploadButton } from "@/components/doctor/DoctorPatientUploadModal";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
 import { HealthMetricCard } from "@/components/dashboard/MetricCards";
@@ -129,9 +130,12 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
               </p>
             </div>
           </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <DoctorPatientUploadButton patientId={id} patientName={patientName} />
           <Link href={`/doctor/patient/${id}/report`} className="px-4 py-2.5 rounded-2xl text-sm font-semibold transition-opacity hover:opacity-90 text-center" style={{ background: "#52B788", color: "#0D0D0B" }}>
             Gerar relatório pré-consulta
           </Link>
+          </div>
         </div>
 
         {/* Navegação por abas */}
