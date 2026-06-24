@@ -4,11 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type RecoverySender = (
-  email: string,
-  options: { redirectTo: string }
-) => Promise<{ error: { message: string } | null }>;
-
 const REQUEST_TIMEOUT_MS = 60000;
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -42,10 +37,8 @@ export default function RecoverPage() {
     try {
       const supabase = createClient();
       const redirectTo = `${window.location.origin}/auth/update-password`;
-      const methodName = ["reset", "Password", "For", "Email"].join("") as keyof typeof supabase.auth;
-      const sendRecovery = supabase.auth[methodName] as RecoverySender;
       const result = await withTimeout(
-        sendRecovery(email.trim().toLowerCase(), { redirectTo }),
+        supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo }),
         REQUEST_TIMEOUT_MS
       );
 

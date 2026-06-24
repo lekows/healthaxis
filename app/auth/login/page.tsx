@@ -71,12 +71,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-white/50 uppercase tracking-wider">Senha</label>
-              <Link href="/auth/recover" className="text-xs text-white/50 hover:text-white transition-colors">
-                Esqueci minha senha
-              </Link>
-            </div>
+            <label className="text-xs text-white/50 uppercase tracking-wider">Senha</label>
             <input
               type="password"
               required
@@ -85,6 +80,11 @@ export default function LoginPage() {
               className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white text-sm outline-none focus:border-white/30 transition-colors"
               placeholder="••••••••"
             />
+            <div className="mt-2 text-right">
+              <Link href="/auth/recover" className="text-xs text-white/50 hover:text-white transition-colors">
+                Esqueci minha senha
+              </Link>
+            </div>
           </div>
 
           {error && (
