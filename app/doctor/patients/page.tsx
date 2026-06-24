@@ -1,14 +1,18 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile, getDoctorCockpitPatients } from "@/lib/supabase/doctor-queries";
-import { PatientPortfolioClient } from "@/components/doctor/PatientPortfolioClient";
+import { PatientPortfolioClient, PORTFOLIO_FILTERS, type PortfolioFilter } from "@/components/doctor/PatientPortfolioClient";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { Users } from "lucide-react";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function DoctorPatientsPage() {
+export default async function DoctorPatientsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ filter?: string }>;
+}) {
   const [profile, doctorProfile, patients] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
@@ -16,6 +20,11 @@ export default async function DoctorPatientsPage() {
   ]);
 
   if (!doctorProfile) redirect("/doctor/setup");
+
+  const requested = (await searchParams)?.filter;
+  const initialFilter: PortfolioFilter = PORTFOLIO_FILTERS.includes(requested as PortfolioFilter)
+    ? (requested as PortfolioFilter)
+    : "all";
 
   const reviewCount = patients.filter((p) => p.signal === "review").length;
   const pendingAiTotal = patients.reduce((total, p) => total + p.pending_ai, 0);
@@ -38,7 +47,7 @@ export default async function DoctorPatientsPage() {
           </div>
         </div>
 
-        <PatientPortfolioClient patients={patients} />
+        <PatientPortfolioClient patients={patients} initialFilter={initialFilter} />
 
         <MedicalDisclaimer compact />
       </div>

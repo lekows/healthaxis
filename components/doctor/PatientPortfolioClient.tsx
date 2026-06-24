@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Search, Users, AlertTriangle, BrainCircuit, FileText, ArrowRight } from "lucide-react";
 import type { DoctorCockpitPatient, DoctorCockpitSignal } from "@/lib/supabase/doctor-queries";
 
-type PortfolioFilter = "all" | "review" | "followup" | "pending_ai" | "new_exam" | "stale";
+export type PortfolioFilter = "all" | "review" | "followup" | "pending_ai" | "new_exam" | "stale";
+export const PORTFOLIO_FILTERS: PortfolioFilter[] = ["all", "review", "followup", "pending_ai", "new_exam", "stale"];
 
 const NEW_EXAM_DAYS = 14;
 const STALE_DAYS = 90;
@@ -58,9 +59,9 @@ function isStale(patient: DoctorCockpitPatient) {
   return patient.days_since_latest_data === null || patient.days_since_latest_data > STALE_DAYS;
 }
 
-export function PatientPortfolioClient({ patients }: { patients: DoctorCockpitPatient[] }) {
+export function PatientPortfolioClient({ patients, initialFilter = "all" }: { patients: DoctorCockpitPatient[]; initialFilter?: PortfolioFilter }) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<PortfolioFilter>("all");
+  const [filter, setFilter] = useState<PortfolioFilter>(initialFilter);
 
   const filters: { value: PortfolioFilter; label: string; count: number }[] = useMemo(() => [
     { value: "all", label: "Todos", count: patients.length },
