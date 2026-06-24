@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
   Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode,
-  Heart, MoreHorizontal, ChevronDown, X, BrainCircuit, type LucideIcon
+  Heart, MoreHorizontal, ChevronDown, X, BrainCircuit, ShieldCheck, Users, type LucideIcon
 } from "lucide-react";
 import { ease } from "@/lib/motion";
 import { signOut } from "@/app/auth/actions";
@@ -29,17 +29,27 @@ const baseSecondaryNav: NavItem[] = [
   { href: "/share", label: "Compartilhar", icon: QrCode }
 ];
 
-export function DashboardLayout({ children, userName, isDoctor = false }: { children: React.ReactNode; userName?: string | null; isDoctor?: boolean }) {
+// Face do médico: navegação 100% clínica, sem itens de autosserviço do paciente.
+const doctorNav: NavItem[] = [
+  { href: "/doctor", label: "Cockpit", icon: Stethoscope },
+  { href: "/doctor/patients", label: "Pacientes", icon: Users },
+  { href: "/doctor/reviews", label: "Revisão IA", icon: BrainCircuit },
+  { href: "/profile", label: "Configurações", icon: Settings }
+];
+
+export function DashboardLayout({ children, userName, isDoctor = false, isClinicalAdmin = false }: { children: React.ReactNode; userName?: string | null; isDoctor?: boolean; isClinicalAdmin?: boolean }) {
   const pathname = usePathname();
   const displayName = userName?.trim() || "Usuário";
 
-  const secondaryNav: NavItem[] = isDoctor
-    ? [
-        ...baseSecondaryNav,
-        { href: "/doctor", label: "Painel Médico", icon: Stethoscope },
-        { href: "/doctor/reviews", label: "Revisão IA", icon: BrainCircuit },
-      ]
-    : baseSecondaryNav;
+  // Médico vê apenas ferramentas clínicas (cockpit, revisão de IA, admin se
+  // aplicável, perfil). Paciente mantém o menu de autosserviço.
+  // Admin clínico entra antes do último item (Configurações), sem derrubá-lo.
+  const doctorItems: NavItem[] = isClinicalAdmin
+    ? [...doctorNav.slice(0, -1), { href: "/doctor/admin", label: "Admin clínico", icon: ShieldCheck }, doctorNav[doctorNav.length - 1]]
+    : doctorNav;
+  const primaryItems: NavItem[] = isDoctor ? doctorItems : primaryNav;
+  const secondaryNav: NavItem[] = isDoctor ? [] : baseSecondaryNav;
+  const hasSecondary = secondaryNav.length > 0;
 
   const secondaryActive = secondaryNav.some(item => pathname === item.href);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -94,7 +104,7 @@ export function DashboardLayout({ children, userName, isDoctor = false }: { chil
 
         {/* Nav items */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {primaryNav.map((item, i) => (
+          {primaryItems.map((item, i) => (
             <motion.div
               key={item.href}
               initial={{ opacity: 0, x: -16 }}
@@ -105,32 +115,34 @@ export function DashboardLayout({ children, userName, isDoctor = false }: { chil
             </motion.div>
           ))}
 
-          <div className="pt-2">
-            <button
-              onClick={() => setMoreOpen(o => !o)}
-              className="w-full relative flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-colors"
-              style={{ color: "#9A9688" }}
-            >
-              <MoreHorizontal size={15} />
-              <span className="flex-1 text-left">Mais</span>
-              <motion.div animate={{ rotate: moreExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                <ChevronDown size={14} />
-              </motion.div>
-            </button>
-            <AnimatePresence initial={false}>
-              {moreExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.25, ease: ease.out }}
-                  className="overflow-hidden space-y-1 mt-1"
-                >
-                  {secondaryNav.map(sidebarLink)}
+          {hasSecondary && (
+            <div className="pt-2">
+              <button
+                onClick={() => setMoreOpen(o => !o)}
+                className="w-full relative flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-colors"
+                style={{ color: "#9A9688" }}
+              >
+                <MoreHorizontal size={15} />
+                <span className="flex-1 text-left">Mais</span>
+                <motion.div animate={{ rotate: moreExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown size={14} />
                 </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+              </button>
+              <AnimatePresence initial={false}>
+                {moreExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: ease.out }}
+                    className="overflow-hidden space-y-1 mt-1"
+                  >
+                    {secondaryNav.map(sidebarLink)}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </nav>
 
         {/* User + bottom actions */}
@@ -206,7 +218,7 @@ export function DashboardLayout({ children, userName, isDoctor = false }: { chil
             borderTop: "1px solid rgba(255,255,255,0.06)",
           }}
         >
-          {primaryNav.map(({ href, icon: Icon, label }) => {
+          {primaryItems.map(({ href, icon: Icon, label }) => {
             const active = pathname === href;
             return (
               <Link key={href} href={href}
@@ -225,19 +237,21 @@ export function DashboardLayout({ children, userName, isDoctor = false }: { chil
               </Link>
             );
           })}
-          <button
-            onClick={() => setSheetOpen(true)}
-            className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors"
-            style={{ color: secondaryActive ? "#52B788" : "#5A5A50" }}
-          >
-            <MoreHorizontal size={18} />
-            <span className="text-xs font-medium">Mais</span>
-          </button>
+          {hasSecondary && (
+            <button
+              onClick={() => setSheetOpen(true)}
+              className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors"
+              style={{ color: secondaryActive ? "#52B788" : "#5A5A50" }}
+            >
+              <MoreHorizontal size={18} />
+              <span className="text-xs font-medium">Mais</span>
+            </button>
+          )}
         </nav>
 
         {/* Bottom sheet "Mais" — mobile only */}
         <AnimatePresence>
-          {sheetOpen && (
+          {sheetOpen && hasSecondary && (
             <>
               <motion.div
                 className="lg:hidden fixed inset-0 z-40"

@@ -51,6 +51,7 @@ export interface DoctorCockpitPatient {
   latest_document_date: string | null;
   latest_data_date: string | null;
   days_since_latest_data: number | null;
+  pending_ai: number;
 }
 
 export interface LinkedDoctor {
@@ -217,7 +218,7 @@ export async function getDoctorCockpitPatients(): Promise<DoctorCockpitPatient[]
   const patientIds = linkedPatients.map((link) => link.patient_id).filter(Boolean);
   if (patientIds.length === 0) return [];
 
-  const [biomarkersRes, documentsRes] = await Promise.all([
+  const [biomarkersRes, documentsRes, pendingRunsRes] = await Promise.all([
     supabase
       .from("biomarkers")
       .select("id, user_id, status, last_date")
@@ -227,16 +228,23 @@ export async function getDoctorCockpitPatients(): Promise<DoctorCockpitPatient[]
       .select("id, user_id, date, created_at")
       .in("user_id", patientIds)
       .order("date", { ascending: false }),
+    supabase
+      .from("agent_runs")
+      .select("id, patient_id")
+      .in("patient_id", patientIds)
+      .eq("human_decision", "pending"),
   ]);
 
   const biomarkers = biomarkersRes.data ?? [];
   const documents = documentsRes.data ?? [];
+  const pendingRuns = pendingRunsRes.data ?? [];
   const nonOptimalStatuses = new Set(["critical", "high", "low", "attention"]);
   const criticalStatuses = new Set(["critical", "high", "low"]);
 
   const rows = linkedPatients.map((link) => {
     const patientBiomarkers = biomarkers.filter((item) => item.user_id === link.patient_id);
     const patientDocuments = documents.filter((item) => item.user_id === link.patient_id);
+    const pendingAi = pendingRuns.filter((item) => item.patient_id === link.patient_id).length;
     const alteredBiomarkers = patientBiomarkers.filter((item) => nonOptimalStatuses.has(item.status)).length;
     const criticalBiomarkers = patientBiomarkers.filter((item) => criticalStatuses.has(item.status)).length;
     const latestDocumentDate = mostRecentDate(patientDocuments.map((item) => item.date ?? item.created_at));
@@ -266,6 +274,7 @@ export async function getDoctorCockpitPatients(): Promise<DoctorCockpitPatient[]
       latest_document_date: latestDocumentDate,
       latest_data_date: latestDataDate,
       days_since_latest_data: daysSinceLatestData,
+      pending_ai: pendingAi,
     } as DoctorCockpitPatient;
   });
 
