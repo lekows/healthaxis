@@ -64,7 +64,7 @@ export default async function DoctorPage() {
     { label: "Pacientes ativos", value: patients.length, hint: "carteira vinculada", href: "/doctor/patients", icon: Users, accent: "#52B788", tint: "rgba(82,183,136,0.1)" },
     { label: "Para revisar hoje", value: reviewCount, hint: "prioridade clínica", href: "/doctor/patients?filter=review", icon: AlertTriangle, accent: "#F4A261", tint: "rgba(193,68,14,0.1)" },
     { label: "IA pendente", value: pendingAiTotal, hint: "aguardando decisão", href: "/doctor/patients?filter=pending_ai", icon: BrainCircuit, accent: "#F4A261", tint: "rgba(244,162,97,0.1)" },
-    { label: "Exames novos", value: newExamCount, hint: `últimos ${NEW_EXAM_DAYS} dias`, href: "/doctor/patients?filter=new_exam", icon: FlaskConical, accent: "#52B788", tint: "rgba(82,183,136,0.1)" },
+    { label: "Exames novos", value: newExamCount, hint: `últimos ${NEW_EXAM_DAYS} dias`, href: "/doctor/exams", icon: FlaskConical, accent: "#52B788", tint: "rgba(82,183,136,0.1)" },
     { label: "Sem movimento", value: staleCount, hint: "sem dado recente", href: "/doctor/patients?filter=stale", icon: Clock3, accent: "#9A9688", tint: "rgba(255,255,255,0.04)" },
   ];
 
