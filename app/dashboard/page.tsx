@@ -201,6 +201,7 @@ export default async function DashboardPage() {
                       lab={d.lab ?? ""}
                       status={d.status}
                       tags={d.tags ?? []}
+                      source={d.source}
                     />
                   ))}
                 </div>
