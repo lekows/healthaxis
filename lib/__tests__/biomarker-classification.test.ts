@@ -56,12 +56,12 @@ describe("inferStatus — biomarcadores comuns", () => {
 
 describe("getReference — referências estáticas canônicas", () => {
   it("vitamina-b12 retorna ref universal [200,900]", () => {
-    const ref = getReference("vitamina-b12", undefined, undefined);
+    const ref = getReference("vitamina-b12", null, null);
     expect(ref).toEqual({ min: 200, max: 900 });
   });
 
   it("glicose retorna referência para adulto", () => {
-    const ref = getReference("glicose", undefined, 30);
+    const ref = getReference("glicose", null, 30);
     expect(ref).toBeDefined();
     if (ref) {
       expect(ref.min).toBeDefined();
@@ -70,15 +70,15 @@ describe("getReference — referências estáticas canônicas", () => {
   });
 
   it("status recomputado com ref estática corrige inconsistência B12=829", () => {
-    const ref = getReference("vitamina-b12", undefined, undefined);
+    const ref = getReference("vitamina-b12", null, null);
     expect(ref).not.toBeNull();
     expect(inferStatus(829, ref!)).toBe("optimal");
   });
 });
 
-describe("SpO2 — sem override canônico, ref do laboratório vence", () => {
-  it("saturacao-oxigenio não tem referência canônica (labs divergem)", () => {
-    expect(getReference("saturacao-oxigenio", null, null)).toBeNull();
+describe("SpO2 — referência canônica min:95, ref do laboratório complementa", () => {
+  it("saturacao-oxigenio tem referência canônica min:95 (sem teto)", () => {
+    expect(getReference("saturacao-oxigenio", null, null)).toEqual({ min: 95 });
   });
 
   it("SpO2 92% com ref Sabin [80,100] → optimal (bug original era critical)", () => {
