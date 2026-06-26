@@ -6,9 +6,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, User, ClipboardList, FlaskConical,
   Clock, FileText, Bell, Settings, LogOut, Activity, Stethoscope, QrCode,
-  Heart, MoreHorizontal, ChevronDown, X, BrainCircuit, ShieldCheck, Users, Target, type LucideIcon
+  Heart, MoreHorizontal, ChevronDown, X, BrainCircuit, ShieldCheck, Users, Target, CalendarDays, type LucideIcon
 } from "lucide-react";
 import { ease } from "@/lib/motion";
+import { appointmentsEnabled } from "@/lib/feature-flags";
 import { signOut } from "@/app/auth/actions";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
@@ -23,6 +24,7 @@ const primaryNav: NavItem[] = [
 
 const baseSecondaryNav: NavItem[] = [
   { href: "/care-plan", label: "Plano", icon: Target },
+  ...(appointmentsEnabled ? [{ href: "/appointments", label: "Consultas", icon: CalendarDays }] : []),
   { href: "/body-map", label: "Mapa Corporal", icon: Activity },
   { href: "/timeline", label: "Linha do Tempo", icon: Clock },
   { href: "/anamnesis", label: "Anamnese", icon: ClipboardList },
@@ -34,6 +36,7 @@ const baseSecondaryNav: NavItem[] = [
 const doctorNav: NavItem[] = [
   { href: "/doctor", label: "Cockpit", icon: Stethoscope },
   { href: "/doctor/patients", label: "Pacientes", icon: Users },
+  ...(appointmentsEnabled ? [{ href: "/doctor/agenda", label: "Agenda", icon: CalendarDays }] : []),
   { href: "/doctor/reviews", label: "Revisão IA", icon: BrainCircuit },
   { href: "/doctor/exams", label: "Exames novos", icon: FlaskConical },
   { href: "/profile", label: "Configurações", icon: Settings }
