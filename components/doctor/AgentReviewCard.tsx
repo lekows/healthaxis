@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, Edit3, ShieldCheck, XCircle } from "lucide-react";
 import type { AgentRunForReview } from "@/lib/supabase/agent-review-queries";
+import { getAgentDisplayName } from "@/lib/agent-display";
 
 interface Props {
   agentRun: AgentRunForReview;
@@ -78,7 +79,9 @@ export function AgentReviewCard({ agentRun, patientId, summary, highlights }: Pr
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <ShieldCheck size={16} style={{ color: "#52B788" }} />
-            <h3 className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{agentRun.agent_name}</h3>
+            <h3 className="text-sm font-semibold" style={{ color: "#E8E4D9" }} title={agentRun.agent_name}>
+              {getAgentDisplayName(agentRun.agent_name)}
+            </h3>
             <span className="px-2 py-1 rounded-full text-[11px] font-semibold" style={decisionStyle(decision)}>
               {decisionLabel(decision)}
             </span>

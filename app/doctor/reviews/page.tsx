@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, BrainCircuit, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BrainCircuit, ShieldCheck, Users } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { AgentReviewCard } from "@/components/doctor/AgentReviewCard";
+import { getPatientDisplayName, getPatientInitials } from "@/lib/patient-display";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile } from "@/lib/supabase/doctor-queries";
 import {
@@ -79,10 +80,28 @@ export default async function DoctorReviewsPage() {
           </section>
         ) : (
           <section className="space-y-4">
-            {pendingReviews.map((review) => (
+            {pendingReviews.map((review) => {
+              const displayName = getPatientDisplayName(review.patient, review.patient_id);
+              const initials = getPatientInitials(review.patient);
+              return (
               <div key={review.id} className="space-y-3">
-                <Link href={`/doctor/patient/${review.patient_id}`} className="inline-flex text-xs font-semibold transition-opacity hover:opacity-80" style={{ color: "#52B788" }}>
-                  {review.patient?.name ?? "Paciente"} · abrir Patient 360
+                <Link
+                  href={`/doctor/patient/${review.patient_id}`}
+                  className="flex items-center gap-3 group transition-opacity hover:opacity-90"
+                >
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                    style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" }}>
+                    {initials ?? <Users size={16} style={{ color: "#52B788" }} />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-widest font-medium" style={{ color: "#5A5A50" }}>Paciente</p>
+                    <p className="text-base lg:text-lg font-semibold leading-tight truncate" title={displayName} style={{ color: "#E8E4D9" }}>
+                      {displayName}
+                    </p>
+                    <span className="text-xs font-semibold group-hover:underline" style={{ color: "#52B788" }}>
+                      Abrir Patient 360 →
+                    </span>
+                  </div>
                 </Link>
                 <AgentReviewCard
                   agentRun={review}
@@ -91,7 +110,8 @@ export default async function DoctorReviewsPage() {
                   highlights={getAgentReviewHighlights(review)}
                 />
               </div>
-            ))}
+              );
+            })}
           </section>
         )}
 

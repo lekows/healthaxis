@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Users, AlertTriangle, BrainCircuit, FileText, ArrowRight } from "lucide-react";
 import type { DoctorCockpitPatient, DoctorCockpitSignal } from "@/lib/supabase/doctor-queries";
+import { getPatientDisplayName, getPatientInitials } from "@/lib/patient-display";
 
 export type PortfolioFilter = "all" | "review" | "followup" | "pending_ai" | "new_exam" | "stale";
 export const PORTFOLIO_FILTERS: PortfolioFilter[] = ["all", "review", "followup", "pending_ai", "new_exam", "stale"];
@@ -73,7 +74,9 @@ export function PatientPortfolioClient({ patients, initialFilter = "all" }: { pa
   ], [patients]);
 
   const filtered = useMemo(() => patients.filter((p) => {
-    const name = p.patient?.name ?? "Paciente";
+    // Busca pelo nome real quando existir; cai para o nome de exibição para que pacientes
+    // sem nome cadastrado ainda sejam encontráveis.
+    const name = p.patient?.name?.trim() || getPatientDisplayName(p.patient);
     const matchesSearch = name.toLowerCase().includes(search.trim().toLowerCase());
     const matchesFilter =
       filter === "all" ? true :
@@ -133,7 +136,8 @@ export function PatientPortfolioClient({ patients, initialFilter = "all" }: { pa
       ) : (
         <div className="space-y-3">
           {filtered.map((p) => {
-            const name = p.patient?.name ?? "Paciente";
+            const name = getPatientDisplayName(p.patient, p.patient_id);
+            const initials = getPatientInitials(p.patient);
             const age = ageFromDob(p.patient?.dob ?? null);
             return (
               <Link
@@ -142,9 +146,13 @@ export function PatientPortfolioClient({ patients, initialFilter = "all" }: { pa
                 className="flex flex-col lg:flex-row lg:items-center gap-3 p-4 rounded-2xl transition-colors hover:bg-white/[0.04]"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
               >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold self-start"
+                  style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" }}>
+                  {initials ?? <Users size={16} style={{ color: "#52B788" }} />}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{name}</p>
+                    <p className="text-base lg:text-lg font-semibold leading-tight truncate max-w-full" title={name} style={{ color: "#E8E4D9" }}>{name}</p>
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold" style={getSignalStyle(p.signal)}>
                       {getSignalLabel(p.signal)}
                     </span>
