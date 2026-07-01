@@ -1,9 +1,12 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile, getMyInvites, getDoctorCockpitPatients } from "@/lib/supabase/doctor-queries";
+import { getDoctorAppointments } from "@/lib/supabase/appointment-queries";
+import { isTerminal } from "@/lib/appointments/status";
+import { appointmentsEnabled } from "@/lib/feature-flags";
 import { InvitePanel } from "@/components/doctor/InvitePanel";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
-import { Stethoscope, Users, AlertTriangle, BrainCircuit, FlaskConical, Clock3, ChevronRight, ArrowRight } from "lucide-react";
+import { Stethoscope, Users, AlertTriangle, BrainCircuit, FlaskConical, Clock3, ChevronRight, ArrowRight, CalendarDays } from "lucide-react";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -34,14 +37,22 @@ function signalStyle(signal: DoctorCockpitSignal) {
 }
 
 export default async function DoctorPage() {
-  const [profile, doctorProfile, invites, patients] = await Promise.all([
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+
+  const [profile, doctorProfile, invites, patients, todayAppointments] = await Promise.all([
     getProfile(),
     getDoctorProfile(),
     getMyInvites(),
     getDoctorCockpitPatients(),
+    appointmentsEnabled
+      ? getDoctorAppointments({ from: todayStart.toISOString(), to: todayEnd.toISOString() })
+      : Promise.resolve([]),
   ]);
 
   if (!doctorProfile) redirect("/doctor/setup");
+
+  const todayAgendaCount = todayAppointments.filter((a) => !isTerminal(a.status)).length;
 
   const headersList = await headers();
   const host = headersList.get("host") ?? "localhost:3002";
@@ -67,6 +78,12 @@ export default async function DoctorPage() {
     { label: "Exames novos", value: newExamCount, hint: `últimos ${NEW_EXAM_DAYS} dias`, href: "/doctor/exams", icon: FlaskConical, accent: "#52B788", tint: "rgba(82,183,136,0.1)" },
     { label: "Sem movimento", value: staleCount, hint: "sem dado recente", href: "/doctor/patients?filter=stale", icon: Clock3, accent: "#9A9688", tint: "rgba(255,255,255,0.04)" },
   ];
+
+  if (appointmentsEnabled) {
+    queueCards.splice(1, 0, {
+      label: "Agenda hoje", value: todayAgendaCount, hint: "consultas do dia", href: "/doctor/agenda", icon: CalendarDays, accent: "#52B788", tint: "rgba(82,183,136,0.1)",
+    });
+  }
 
   return (
     <DashboardLayout userName={profile?.name} isDoctor={!!doctorProfile}>
@@ -94,7 +111,7 @@ export default async function DoctorPage() {
         </div>
 
         {/* Filas de trabalho */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className={`grid grid-cols-2 gap-4 ${queueCards.length >= 6 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
           {queueCards.map((card) => (
             <Link key={card.label} href={card.href}
               className="group rounded-3xl p-5 transition-colors hover:bg-white/[0.04]"
