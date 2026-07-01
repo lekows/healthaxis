@@ -152,6 +152,7 @@ export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
       externalOrderType: normalizeExamIdentifier(data.identificador_externo?.tipo),
       semanticFingerprint: semanticInput ? await sha256Hex(semanticInput) : null,
       examDate: data.data_exame ?? null,
+      labDisplay: data.laboratorio?.nome?.trim() ?? null,
     });
 
     if (identityResult.duplicate) {
