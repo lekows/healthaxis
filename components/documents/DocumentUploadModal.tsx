@@ -32,6 +32,20 @@ function namesMismatch(profileName: string, examName: string): boolean {
   return !profileWords.some(word => examNorm.includes(word));
 }
 
+// Mensagem clínica por faixa de progresso — acompanha o soft-progress de forma contínua,
+// evitando a sensação de "travado" quando a chamada de análise (bloqueante) está em andamento.
+function stageMessage(progress: number): string {
+  if (progress < 15) return "Preparando o arquivo…";
+  if (progress < 25) return "Salvando documento com segurança…";
+  if (progress < 35) return "Lendo o PDF ou imagem…";
+  if (progress < 50) return "Extraindo texto do laudo…";
+  if (progress < 65) return "Identificando biomarcadores e valores…";
+  if (progress < 78) return "Validando unidades e referências…";
+  if (progress < 88) return "Organizando histórico e tendências…";
+  if (progress < 95) return "Salvando resultados no painel…";
+  return "Finalizando…";
+}
+
 // ── Modal ────────────────────────────────────────────────────────────────────
 interface ModalProps { onClose: () => void; userName?: string; }
 
@@ -56,7 +70,6 @@ export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   const [loading, setLoading]         = useState(false);
   const [loadingMsg, setLoadingMsg]   = useState("");
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrMsg, setOcrMsg]           = useState("");
   const [error, setError]             = useState<string | null>(null);
   const [nameWarning, setNameWarning] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<(ImportSummary & { examDate: string | null }) | null>(null);
@@ -77,30 +90,35 @@ export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
   useEffect(() => {
     if (loadingMsg !== "Analisando exame…") {
       setOcrProgress(0);
-      setOcrMsg("");
       return;
     }
-    // Timer de fallback: avança até 25% enquanto o primeiro bump do servidor não chega.
+    // Soft-progress: sobe suavemente até ~88% enquanto a análise (chamada bloqueante ao
+    // Claude) está em andamento, sem nunca alcançar 100% antes do resultado real. Curva de
+    // aproximação assintótica — rápida no início e desacelerando perto do alvo.
+    const SOFT_TARGET = 88;
+    const TAU_MS = 22000;
     const start = Date.now();
     const timerId = setInterval(() => {
-      const t = Math.min((Date.now() - start) / 30000, 1);
-      setOcrProgress(p => Math.max(p, Math.round((1 - Math.pow(1 - t, 2)) * 25)));
-    }, 500);
+      const elapsed = Date.now() - start;
+      const soft = Math.round(SOFT_TARGET * (1 - Math.exp(-elapsed / TAU_MS)));
+      setOcrProgress(p => Math.max(p, soft));
+    }, 400);
 
     const docId = pendingDocumentId.current;
     if (!docId) return () => clearInterval(timerId);
 
+    // Combina com o progresso real reportado pelo backend (extraction_progress): o maior vence,
+    // então os marcos reais (85/95) assumem quando chegam, sem regressão.
     const supabase = createClient();
     const poll = async () => {
       const { data } = await supabase
         .from("documents")
-        .select("extraction_progress, extraction_message")
+        .select("extraction_progress")
         .eq("id", docId)
         .maybeSingle();
       if (data?.extraction_progress != null && data.extraction_progress > 0) {
         setOcrProgress(p => Math.max(p, data.extraction_progress ?? 0));
       }
-      if (data?.extraction_message) setOcrMsg(data.extraction_message);
     };
 
     poll();
@@ -219,12 +237,14 @@ export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
         return;
       }
       if (bioResult?.importSummary) {
+        setOcrProgress(100);
         router.refresh();
         setImportSummary({ ...bioResult.importSummary, examDate: data.data_exame ?? null });
         return;
       }
     }
 
+    setOcrProgress(100);
     router.refresh();
     onClose();
   };
@@ -383,6 +403,9 @@ export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
             return;
           }
 
+          // Backend já finalizou (100); resta a gravação no cliente. Empurra a barra para a
+          // faixa final para não estacionar em ~88% durante o upsert de biomarcadores.
+          setOcrProgress(p => Math.max(p, 92));
           await saveOcrResults(data);
           // Fire-and-forget: trigger metabolic pattern analysis in background
           fetch("/api/agents/metabolic-analysis", {
@@ -657,14 +680,7 @@ export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
                 style={{ background: "rgba(82,183,136,0.06)", border: "1px solid rgba(82,183,136,0.15)" }}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm" style={{ color: "#52B788" }}>
-                    {ocrMsg || (
-                      ocrProgress < 15 ? "Iniciando análise…"
-                      : ocrProgress < 35 ? "Identificando biomarcadores…"
-                      : ocrProgress < 60 ? "Verificando referências laboratoriais…"
-                      : ocrProgress < 80 ? "Organizando histórico clínico…"
-                      : ocrProgress < 92 ? "Quase pronto…"
-                      : "Finalizando…"
-                    )}
+                    {stageMessage(ocrProgress)}
                   </span>
                   <span className="text-xs font-mono tabular-nums" style={{ color: "#5A5A50" }}>{ocrProgress}%</span>
                 </div>
@@ -675,6 +691,9 @@ export function DocumentUploadModalInner({ onClose, userName }: ModalProps) {
                     transition: "width 0.4s ease-out",
                   }} />
                 </div>
+                <p className="text-xs" style={{ color: "#5A5A50" }}>
+                  Isso pode levar alguns segundos em exames longos.
+                </p>
               </div>
             ) : (
               <div className="flex items-center gap-2 p-3 rounded-xl text-sm"

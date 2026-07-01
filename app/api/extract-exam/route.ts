@@ -271,7 +271,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ resultados: [], ocr_error: "Serviço de análise não configurado." });
     }
 
-    bump(5, "Iniciando análise…");
+    bump(10, "Recebendo arquivo…");
 
     // Texto colado pelo usuário — caminho direto, zero tokens de ruído de PDF
     if (pastedText && pastedText.trim().length > 10) {
@@ -285,7 +285,8 @@ export async function POST(req: NextRequest) {
         ? pastedText.substring(0, 60000) + "\n\n[...]\n\n" + pastedText.substring(pastedText.length - 25000)
         : pastedText;
       console.log(`[extract-exam] Texto colado (${pastedText.length} chars). Usando texto direto.`);
-      bump(30, "Enviando para análise…");
+      bump(40, "Preparando texto para análise…");
+      bump(50, "Enviando laudo para extração clínica…");
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: MAX_OUTPUT_TOKENS,
@@ -294,8 +295,9 @@ export async function POST(req: NextRequest) {
       });
       const block = msg.content[0];
       const responseText = block.type === "text" ? block.text : "";
-      bump(90, "Interpretando resultados…");
+      bump(85, "Interpretando referências e histórico…");
       const examData = parseResponse(responseText);
+      bump(95, "Finalizando resultados…");
       await finalizeExtraction(true);
       return NextResponse.json({
         ...examData,
@@ -324,6 +326,7 @@ export async function POST(req: NextRequest) {
         await finalizeExtraction(false, "Origem do arquivo não permitida.");
         return NextResponse.json({ resultados: [], ocr_error: "Origem do arquivo não permitida." });
       }
+      bump(20, "Baixando arquivo enviado…");
       const ctrl = new AbortController();
       const storageTimeout = setTimeout(() => ctrl.abort(), 20000);
       let resp: Response;
@@ -352,7 +355,7 @@ export async function POST(req: NextRequest) {
       isPDF = buffer.slice(0, 5).toString("ascii") === "%PDF-";
       if (!isPDF && imageTypes.includes(file!.type)) imageMediaType = file!.type as typeof imageMediaType;
     }
-    bump(20, "Arquivo recebido…");
+    bump(25, "Arquivo recebido…");
 
     const client = new Anthropic();
     let responseText = "";
@@ -360,10 +363,12 @@ export async function POST(req: NextRequest) {
 
     if (isPDF) {
       // Tenta extrair texto do PDF primeiro (muito mais barato)
+      bump(30, "Lendo conteúdo do PDF…");
       const pdfText = await extractPdfText(buffer);
 
       if (pdfText) {
         deterministicIdentifier = extractKnownExternalIdentifier(pdfText) ?? deterministicIdentifier;
+        bump(40, "Preparando texto para análise…");
         // Para laudos muito grandes (ex: Sabin 49 páginas ≈ 120k chars), a tabela comparativa
         // fica nas últimas páginas. Estratégia head+tail: primeiros 60k + últimos 25k chars,
         // cobrindo resultados e histórico sem estourar o timeout do gateway (504).
@@ -372,7 +377,7 @@ export async function POST(req: NextRequest) {
           ? pdfText.substring(0, 60000) + "\n\n[...]\n\n" + pdfText.substring(pdfText.length - 25000)
           : pdfText;
         console.log(`[extract-exam] PDF digital (${pdfText.length} chars → ${truncated.length} enviados). Usando texto.`);
-        bump(35, "Enviando para análise…");
+        bump(50, "Enviando laudo para extração clínica…");
         const msg = await client.messages.create({
           model: "claude-haiku-4-5-20251001",
           max_tokens: MAX_OUTPUT_TOKENS,
@@ -387,7 +392,7 @@ export async function POST(req: NextRequest) {
       } else {
         // PDF escaneado — envia como documento via beta
         console.log("[extract-exam] PDF escaneado. Usando visão.");
-        bump(28, "Enviando PDF para visão computacional…");
+        bump(50, "Enviando laudo para extração clínica…");
         const base64 = buffer.toString("base64");
         const msg = await client.beta.messages.create({
           model: "claude-haiku-4-5-20251001",
@@ -407,7 +412,8 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Imagem (JPG, PNG, WebP)
-      bump(28, "Enviando imagem para análise…");
+      bump(35, "Lendo a imagem…");
+      bump(50, "Enviando laudo para extração clínica…");
       const base64 = buffer.toString("base64");
       const msg = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
@@ -425,10 +431,11 @@ export async function POST(req: NextRequest) {
       responseText = block.type === "text" ? block.text : "";
     }
 
-    bump(90, "Interpretando resultados…");
+    bump(85, "Interpretando referências e histórico…");
     console.log("[extract-exam] responseText (primeiros 800 chars):", responseText.substring(0, 800));
     const examData = parseResponse(responseText);
     console.log("[extract-exam] examData final:", JSON.stringify({ resultados: examData.resultados.length, medico: examData.medico_solicitante?.nome, data: examData.data_exame }));
+    bump(95, "Finalizando resultados…");
     await finalizeExtraction(true);
     return NextResponse.json({
       ...examData,
