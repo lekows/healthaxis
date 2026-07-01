@@ -160,3 +160,58 @@ describe("canonicalSlug — desambiguação SpO2 vs. transferrina", () => {
     expect(canonicalSlug("aptt")).toBe("ttpa");
   });
 });
+
+describe("canonicalSlug — bastonetes nunca vira basofilos (bug do laudo Sabin)", () => {
+  it("bastonetes → neutrofilos-bastonetes", () => {
+    expect(canonicalSlug("bastonetes")).toBe("neutrofilos-bastonetes");
+  });
+
+  it("basofilos permanece basofilos", () => {
+    expect(canonicalSlug("basofilos")).toBe("basofilos");
+  });
+
+  it("bastonetes e basofilos são slugs distintos", () => {
+    expect(canonicalSlug("bastonetes")).not.toBe(canonicalSlug("basofilos"));
+  });
+});
+
+describe("canonicalSlug — exames hospitalares / cardiológicos", () => {
+  it("egfr / tfg / etfg / ckd-epi → taxa-filtracao-glomerular", () => {
+    for (const raw of ["egfr", "tfg", "etfg", "ckd-epi", "taxa-de-filtracao-glomerular"]) {
+      expect(canonicalSlug(raw)).toBe("taxa-filtracao-glomerular");
+    }
+  });
+
+  it("nt-pro-bnp / ntprobnp / pro-bnp → nt-probnp", () => {
+    for (const raw of ["nt-pro-bnp", "ntprobnp", "pro-bnp"]) {
+      expect(canonicalSlug(raw)).toBe("nt-probnp");
+    }
+  });
+
+  it("bnp puro NÃO é mapeado para nt-probnp", () => {
+    expect(canonicalSlug("bnp")).toBe("bnp");
+  });
+
+  it("calcio-ionizado / ca-ionico → calcio-ionico", () => {
+    expect(canonicalSlug("calcio-ionizado")).toBe("calcio-ionico");
+    expect(canonicalSlug("ca-ionico")).toBe("calcio-ionico");
+  });
+
+  it("acido-latico / lactato-venoso → lactato", () => {
+    expect(canonicalSlug("acido-latico")).toBe("lactato");
+    expect(canonicalSlug("lactato-venoso")).toBe("lactato");
+  });
+
+  it("relações de coagulação canonizam", () => {
+    expect(canonicalSlug("atividade-de-protrombina")).toBe("atividade-protrombina");
+    expect(canonicalSlug("relacao-protrombina")).toBe("protrombina-relacao");
+    expect(canonicalSlug("relacao-ttpa")).toBe("ttpa-relacao");
+  });
+
+  it("gasometria preserva distinção arterial/venoso", () => {
+    expect(canonicalSlug("bicarbonato-venoso")).toBe("hco3-venoso");
+    expect(canonicalSlug("hco3")).toBe("hco3-arterial");
+    expect(canonicalSlug("be-venoso")).toBe("base-excess-venoso");
+    expect(canonicalSlug("hco3-venoso")).not.toBe(canonicalSlug("hco3"));
+  });
+});

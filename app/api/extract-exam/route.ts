@@ -22,19 +22,23 @@ const PROMPT_BASE = `Extraia TODOS os resultados numéricos presentes neste exam
 
 Para cada parâmetro encontrado, retorne:
 - slug: identificador em minúsculas com hífens. Use EXATAMENTE estes slugs canônicos quando o biomarcador for reconhecido:
-  hemograma: hemoglobina, hematocrito, hemacias, leucocitos, neutrofilos, linfocitos, monocitos, eosinofilos, basofilos, plaquetas, vcm, hcm, chcm, rdw, reticulocitos
+  hemograma: hemoglobina, hematocrito, hemacias, leucocitos, neutrofilos, bastonetes, linfocitos, monocitos, eosinofilos, basofilos, plaquetas, vcm, hcm, chcm, rdw, reticulocitos
   lipídios: colesterol-total, ldl-colesterol, hdl-colesterol, triglicerides, vldl
   glicemia: glicose, hemoglobina-glicada, insulina
   tireoide: tsh, t4-livre, t3-livre, anti-tpo
   vitaminas: vitamina-d, vitamina-b12, acido-folico
   ferro: ferritina, ferro-serico, tibc, saturacao-transferrina
   oximetria: saturacao-oxigenio (SpO2 / oximetria de pulso / saturação periférica — NÃO confundir com saturacao-transferrina)
-  função renal: creatinina, ureia, acido-urico
+  função renal: creatinina, ureia, acido-urico, taxa-filtracao-glomerular (eTFG / eGFR / TFG / CKD-EPI)
   função hepática: ast-tgo, alt-tgp, ggt, fosfatase-alcalina, bilirrubina-total, bilirrubina-direta, albumina, proteinas-totais
-  eletrólitos: sodio, potassio, calcio, magnesio, fosforo, cloro
-  coagulação: tempo-protrombina, inr, ttpa, fibrinogenio, d-dimero
+  eletrólitos: sodio, potassio, calcio, calcio-ionico, magnesio, fosforo, cloro
+  coagulação: tempo-protrombina, atividade-protrombina, protrombina-relacao, inr, ttpa, ttpa-relacao, fibrinogenio, d-dimero
+  gasometria: ph-arterial, ph-venoso, hco3-arterial, hco3-venoso, base-excess, base-excess-venoso, lactato
   inflamação: proteina-c-reativa, vhs
+  cardíacos: troponina, nt-probnp
   hormônios: cortisol, testosterona-total, estradiol, progesterona, fsh, lh, prolactina
+  ATENÇÃO hemograma: "bastonetes" (neutrófilos bastonetes / "desvio à esquerda") é um marcador DIFERENTE de "basofilos". Nunca use o slug de um para o outro — extraia cada um na sua própria linha com seu próprio valor.
+  ATENÇÃO gasometria: preserve a distinção arterial/venoso do laudo (ex.: pH venoso → ph-venoso, HCO3 venoso → hco3-venoso, base excess/BE venoso → base-excess-venoso). Não misture amostras arteriais e venosas no mesmo slug.
   Para biomarcadores não listados, crie slug descritivo em minúsculas com hífens (ex: "25-oh-vitamina-d3")
 - nome: nome completo como aparece no exame
 - valor: valor numérico do resultado (use ponto como decimal)

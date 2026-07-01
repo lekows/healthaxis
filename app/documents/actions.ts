@@ -81,10 +81,27 @@ export async function registerDocumentExamIdentity(data: {
   externalOrderType: string | null;
   semanticFingerprint: string | null;
   examDate?: string | null;
+  // Nome do laboratório para exibição (ex.: "Sabin"), extraído do laudo.
+  // Diferente de sourceLab, que é normalizado (minúsculo/sem espaços) para deduplicação.
+  labDisplay?: string | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Sessao expirada. Faca login novamente." };
+
+  // Preenche documents.lab com o laboratório detectado APENAS quando o campo está vazio,
+  // sem sobrescrever o valor que o paciente digitou no formulário.
+  const labDisplay = data.labDisplay?.trim() || null;
+  let labBackfill: { lab: string } | Record<string, never> = {};
+  if (labDisplay) {
+    const { data: current } = await supabase
+      .from("documents")
+      .select("lab")
+      .eq("id", data.documentId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!current?.lab || !String(current.lab).trim()) labBackfill = { lab: labDisplay };
+  }
 
   const { error } = await supabase
     .from("documents")
@@ -94,6 +111,7 @@ export async function registerDocumentExamIdentity(data: {
       external_order_type: data.externalOrderType,
       semantic_fingerprint: data.semanticFingerprint,
       ...(data.examDate ? { date: data.examDate } : {}),
+      ...labBackfill,
     })
     .eq("id", data.documentId)
     .eq("user_id", user.id);
@@ -225,6 +243,10 @@ export async function saveExamBiomarkers(
           status:    e.status,
           trend:     e.trend,
           last_date: examDate,
+          // Rastreabilidade do snapshot: qual documento originou este valor atual.
+          // Upload iniciado pelo paciente → sem médico responsável (null).
+          last_source_document_id:    documentId ?? null,
+          last_uploaded_by_doctor_id: null,
         })),
         { onConflict: "user_id,slug" }
       );
