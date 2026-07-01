@@ -1,20 +1,34 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, BrainCircuit, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, BrainCircuit, ShieldCheck } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
-import { AgentReviewCard } from "@/components/doctor/AgentReviewCard";
-import { getPatientDisplayName, getPatientInitials } from "@/lib/patient-display";
+import { AgentReviewPatientGroup, type GroupReview } from "@/components/doctor/AgentReviewPatientGroup";
+import { groupReviewsByPatient } from "@/lib/agent-review-grouping";
 import { getProfile } from "@/lib/supabase/queries";
 import { getDoctorProfile } from "@/lib/supabase/doctor-queries";
 import {
   getAgentReviewHighlights,
   getAgentReviewSummary,
   getDoctorAgentReviewQueue,
+  type AgentReviewQueueItem,
 } from "@/lib/supabase/agent-review-queries";
 
-export default async function DoctorReviewsPage() {
-  const [profile, doctorProfile, pendingReviews, allReviews] = await Promise.all([
+const TABS = [
+  { value: "pending", label: "Pendentes" },
+  { value: "reviewed", label: "Revisadas" },
+  { value: "all", label: "Todas" },
+] as const;
+
+type TabValue = (typeof TABS)[number]["value"];
+
+interface Props {
+  searchParams?: Promise<{ tab?: string }>;
+}
+
+export default async function DoctorReviewsPage({ searchParams }: Props) {
+  const [{ tab }, profile, doctorProfile, pendingReviews, allReviews] = await Promise.all([
+    searchParams ?? Promise.resolve({ tab: undefined }),
     getProfile(),
     getDoctorProfile(),
     getDoctorAgentReviewQueue("pending", 50),
@@ -23,7 +37,27 @@ export default async function DoctorReviewsPage() {
 
   if (!doctorProfile) redirect("/doctor/setup");
 
-  const reviewedCount = allReviews.filter((item) => item.human_decision !== "pending").length;
+  const reviewedReviews = allReviews.filter((item) => item.human_decision !== "pending");
+  const activeTab: TabValue = TABS.some((t) => t.value === tab) ? (tab as TabValue) : "pending";
+
+  const tabCounts: Record<TabValue, number> = {
+    pending: pendingReviews.length,
+    reviewed: reviewedReviews.length,
+    all: allReviews.length,
+  };
+
+  const activeList =
+    activeTab === "reviewed" ? reviewedReviews :
+    activeTab === "all" ? allReviews :
+    pendingReviews;
+
+  const groups = groupReviewsByPatient(activeList);
+
+  const build = (review: AgentReviewQueueItem): GroupReview => ({
+    review,
+    summary: getAgentReviewSummary(review),
+    highlights: getAgentReviewHighlights(review),
+  });
 
   return (
     <DashboardLayout userName={profile?.name} isDoctor>
@@ -41,7 +75,7 @@ export default async function DoctorReviewsPage() {
               <div>
                 <p className="text-xs uppercase tracking-widest font-medium" style={{ color: "#5A5A50" }}>Fila de revisão</p>
                 <h1 className="text-2xl font-bold mt-1" style={{ color: "#E8E4D9" }}>Revisão humana de IA</h1>
-                <p className="text-sm mt-1" style={{ color: "#9A9688" }}>Aceitar, editar ou rejeitar análises antes de uso clínico.</p>
+                <p className="text-sm mt-1" style={{ color: "#9A9688" }}>Fila por paciente. Aceitar, editar ou rejeitar análises antes de uso clínico.</p>
               </div>
             </div>
           </div>
@@ -55,7 +89,7 @@ export default async function DoctorReviewsPage() {
           </div>
           <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
             <ShieldCheck size={18} style={{ color: "#52B788" }} />
-            <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{reviewedCount}</p>
+            <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{reviewedReviews.length}</p>
             <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Já revisadas</p>
           </div>
           <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -72,46 +106,47 @@ export default async function DoctorReviewsPage() {
           </p>
         </section>
 
-        {pendingReviews.length === 0 ? (
+        {/* Abas de filtro */}
+        <div className="flex flex-wrap gap-2">
+          {TABS.map((t) => {
+            const active = t.value === activeTab;
+            return (
+              <Link
+                key={t.value}
+                href={t.value === "pending" ? "/doctor/reviews" : `/doctor/reviews?tab=${t.value}`}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+                style={{
+                  background: active ? "rgba(82,183,136,0.14)" : "rgba(255,255,255,0.04)",
+                  border: active ? "1px solid rgba(82,183,136,0.3)" : "1px solid rgba(255,255,255,0.07)",
+                  color: active ? "#52B788" : "#9A9688",
+                }}
+              >
+                {t.label} <span style={{ color: active ? "#52B788" : "#5A5A50" }}>· {tabCounts[t.value]}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {groups.length === 0 ? (
           <section className="rounded-3xl p-8 text-center" style={{ background: "#141412", border: "1px dashed rgba(255,255,255,0.12)" }}>
             <BrainCircuit size={30} className="mx-auto" style={{ color: "#5A5A50" }} />
-            <p className="text-sm font-semibold mt-4" style={{ color: "#E8E4D9" }}>Nenhuma análise pendente</p>
+            <p className="text-sm font-semibold mt-4" style={{ color: "#E8E4D9" }}>
+              {activeTab === "pending" ? "Nenhuma análise pendente" : "Nenhuma análise nesta aba"}
+            </p>
             <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Quando houver uma análise automatizada concluída, ela aparecerá aqui.</p>
           </section>
         ) : (
           <section className="space-y-4">
-            {pendingReviews.map((review) => {
-              const displayName = getPatientDisplayName(review.patient, review.patient_id);
-              const initials = getPatientInitials(review.patient);
-              return (
-              <div key={review.id} className="space-y-3">
-                <Link
-                  href={`/doctor/patient/${review.patient_id}`}
-                  className="flex items-center gap-3 group transition-opacity hover:opacity-90"
-                >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
-                    style={{ background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" }}>
-                    {initials ?? <Users size={16} style={{ color: "#52B788" }} />}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-widest font-medium" style={{ color: "#5A5A50" }}>Paciente</p>
-                    <p className="text-base lg:text-lg font-semibold leading-tight truncate" title={displayName} style={{ color: "#E8E4D9" }}>
-                      {displayName}
-                    </p>
-                    <span className="text-xs font-semibold group-hover:underline" style={{ color: "#52B788" }}>
-                      Abrir Patient 360 →
-                    </span>
-                  </div>
-                </Link>
-                <AgentReviewCard
-                  agentRun={review}
-                  patientId={review.patient_id}
-                  summary={getAgentReviewSummary(review)}
-                  highlights={getAgentReviewHighlights(review)}
-                />
-              </div>
-              );
-            })}
+            {groups.map((group) => (
+              <AgentReviewPatientGroup
+                key={group.patientId}
+                patient={group.patient}
+                patientId={group.patientId}
+                pendingCount={group.pendingCount}
+                latest={build(group.reviews[0])}
+                older={group.reviews.slice(1).map(build)}
+              />
+            ))}
           </section>
         )}
 

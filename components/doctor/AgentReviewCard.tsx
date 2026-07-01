@@ -12,14 +12,14 @@ interface Props {
   highlights: string[];
 }
 
-function decisionLabel(decision: AgentRunForReview["human_decision"]) {
+export function decisionLabel(decision: AgentRunForReview["human_decision"]) {
   if (decision === "accepted") return "Aceita";
   if (decision === "edited") return "Editada";
   if (decision === "rejected") return "Rejeitada";
   return "Pendente";
 }
 
-function decisionStyle(decision: AgentRunForReview["human_decision"]) {
+export function decisionStyle(decision: AgentRunForReview["human_decision"]) {
   if (decision === "accepted") return { background: "rgba(82,183,136,0.1)", border: "1px solid rgba(82,183,136,0.2)", color: "#52B788" };
   if (decision === "edited") return { background: "rgba(244,162,97,0.1)", border: "1px solid rgba(244,162,97,0.22)", color: "#F4A261" };
   if (decision === "rejected") return { background: "rgba(193,68,14,0.12)", border: "1px solid rgba(193,68,14,0.24)", color: "#F4A261" };
