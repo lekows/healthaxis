@@ -272,7 +272,14 @@ export async function POST(req: NextRequest) {
     // Texto colado pelo usuário — caminho direto, zero tokens de ruído de PDF
     if (pastedText && pastedText.trim().length > 10) {
       const client = new Anthropic();
-      const truncated = pastedText.length > 12000 ? pastedText.substring(0, 12000) : pastedText;
+      // Mesma estratégia do PDF digital: o limite antigo de 12000 chars cortava
+      // laudos grandes colados do portal (ex: Shift), onde a lista de "Ordens de
+      // serviço" enche os primeiros milhares de chars e os resultados numéricos +
+      // a tabela comparativa vêm depois. head+tail (60k + 25k) cobre ambos.
+      const PASTED_LIMIT = 85000;
+      const truncated = pastedText.length > PASTED_LIMIT
+        ? pastedText.substring(0, 60000) + "\n\n[...]\n\n" + pastedText.substring(pastedText.length - 25000)
+        : pastedText;
       console.log(`[extract-exam] Texto colado (${pastedText.length} chars). Usando texto direto.`);
       bump(30, "Enviando para análise…");
       const msg = await client.messages.create({

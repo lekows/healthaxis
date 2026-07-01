@@ -153,8 +153,20 @@ export async function saveDoctorPatientExamBiomarkers(
     };
   });
 
+  // Um único INSERT .. ON CONFLICT não pode atingir a mesma linha (user_id, slug)
+  // duas vezes ("cannot affect row a second time"). Laudos trazem o mesmo slug
+  // repetido (ex: gasometria arterial e venosa mapeadas ao mesmo slug, ou o
+  // resultado individual + a linha da tabela comparativa). Mantém a primeira
+  // ocorrência para a tabela de estado atual; o histórico já é deduplicado abaixo.
+  const seenSlugs = new Set<string>();
+  const dedupedForUpsert = resolved.filter((e) => {
+    if (seenSlugs.has(e.slug)) return false;
+    seenSlugs.add(e.slug);
+    return true;
+  });
+
   const { error: upsertErr } = await supabase.from("biomarkers").upsert(
-    resolved.map((e) => ({
+    dedupedForUpsert.map((e) => ({
       user_id: patientId,
       slug: e.slug,
       name: e.name,
