@@ -52,11 +52,20 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
   const doctorItems: NavItem[] = isClinicalAdmin
     ? [...doctorNav.slice(0, -1), { href: "/doctor/admin", label: "Admin clínico", icon: ShieldCheck }, doctorNav[doctorNav.length - 1]]
     : doctorNav;
+  // Sidebar desktop: lista clínica completa (comportamento inalterado).
   const primaryItems: NavItem[] = isDoctor ? doctorItems : primaryNav;
   const secondaryNav: NavItem[] = isDoctor ? [] : baseSecondaryNav;
   const hasSecondary = secondaryNav.length > 0;
 
-  const secondaryActive = secondaryNav.some(item => pathname === item.href);
+  // Barra inferior mobile: o médico tem 6-7 itens com rótulos longos que
+  // estouram a largura da tela. Espelhamos o padrão do paciente (poucos itens
+  // fixos + folha "Mais") também para o médico, sem alterar a sidebar desktop.
+  const MOBILE_PRIMARY_MAX = 4;
+  const mobilePrimaryItems: NavItem[] = isDoctor ? doctorItems.slice(0, MOBILE_PRIMARY_MAX) : primaryNav;
+  const mobileSecondaryItems: NavItem[] = isDoctor ? doctorItems.slice(MOBILE_PRIMARY_MAX) : baseSecondaryNav;
+  const hasMobileSecondary = mobileSecondaryItems.length > 0;
+
+  const secondaryActive = mobileSecondaryItems.some(item => pathname === item.href);
   const [moreOpen, setMoreOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const moreExpanded = moreOpen || secondaryActive;
@@ -182,7 +191,7 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
       </motion.aside>
 
       {/* Main */}
-      <div className="flex-1 lg:pl-64">
+      <div className="flex-1 lg:pl-64 min-w-0">
         {/* Mobile header */}
         <motion.header
           className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-3"
@@ -233,7 +242,7 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
             borderTop: "1px solid rgba(255,255,255,0.06)",
           }}
         >
-          {primaryItems.map(({ href, icon: Icon, label }) => {
+          {mobilePrimaryItems.map(({ href, icon: Icon, label }) => {
             const active = pathname === href;
             return (
               <Link key={href} href={href}
@@ -252,7 +261,7 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
               </Link>
             );
           })}
-          {hasSecondary && (
+          {hasMobileSecondary && (
             <button
               onClick={() => setSheetOpen(true)}
               className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors"
@@ -266,7 +275,7 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
 
         {/* Bottom sheet "Mais" — mobile only */}
         <AnimatePresence>
-          {sheetOpen && hasSecondary && (
+          {sheetOpen && hasMobileSecondary && (
             <>
               <motion.div
                 className="lg:hidden fixed inset-0 z-40"
@@ -291,7 +300,7 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
                   </button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {secondaryNav.map(({ href, label, icon: Icon }) => {
+                  {mobileSecondaryItems.map(({ href, label, icon: Icon }) => {
                     const active = pathname === href;
                     return (
                       <Link

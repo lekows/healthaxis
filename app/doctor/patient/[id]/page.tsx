@@ -12,7 +12,8 @@ import { DoctorPatientUploadButton } from "@/components/doctor/DoctorPatientUplo
 import { MedicalDisclaimer } from "@/components/shared/MedicalDisclaimer";
 import { STATUS_SEVERITY, isOutOfRange } from "@/components/shared/BiomarkerCard";
 import { HealthMetricCard } from "@/components/dashboard/MetricCards";
-import { AlertTriangle, BarChart3, FileText, FlaskConical, ArrowLeft, ShieldAlert, ShieldCheck, Stethoscope, Clock, BrainCircuit, ClipboardList, FolderOpen } from "lucide-react";
+import { PatientTimeline, type TimelineEvent, type TimelineDecision } from "@/components/doctor/PatientTimeline";
+import { AlertTriangle, BarChart3, FileText, FlaskConical, ArrowLeft, ShieldAlert, ShieldCheck, Stethoscope, Clock, BrainCircuit, ClipboardList, FolderOpen, ChevronRight } from "lucide-react";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -52,6 +53,21 @@ function formatDate(date: string | null | undefined) {
   return new Date(date).toLocaleDateString("pt-BR");
 }
 
+// Nomes técnicos dos agentes → rótulos legíveis para o médico na timeline.
+const AGENT_LABELS: Record<string, string> = {
+  metabolic_analysis: "Análise metabólica",
+  consultation_prep: "Preparação de consulta",
+};
+const agentLabel = (name: string) => AGENT_LABELS[name] ?? name;
+
+// Decisão humana da IA → badge legível (mesma paleta do restante do cockpit).
+const DECISION_META: Record<string, TimelineDecision> = {
+  pending: { label: "Aguardando revisão", color: "#9A9688", bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.07)" },
+  accepted: { label: "Aceita", color: "#52B788", bg: "rgba(82,183,136,0.1)", border: "rgba(82,183,136,0.2)" },
+  edited: { label: "Editada", color: "#F4A261", bg: "rgba(244,162,97,0.1)", border: "rgba(244,162,97,0.22)" },
+  rejected: { label: "Rejeitada", color: "#F4A261", bg: "rgba(193,68,14,0.12)", border: "rgba(193,68,14,0.24)" },
+};
+
 export default async function DoctorPatientPage({ params, searchParams }: Props) {
   const { id } = await params;
   const requestedTab = (await searchParams)?.tab;
@@ -89,10 +105,25 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
     return acc;
   }, {});
 
-  const timelineEvents = [
-    ...panel.documents.map((d) => ({ kind: "exam" as const, date: d.date as string | null, title: `Exame: ${d.title}`, sub: d.lab ?? "Documento enviado pelo paciente" })),
-    ...agentRuns.map((r) => ({ kind: "ai" as const, date: r.created_at as string | null, title: `Análise de IA: ${r.agent_name}`, sub: `Decisão humana: ${r.human_decision}` })),
-  ].filter((e) => e.date).sort((a, b) => new Date(b.date as string).getTime() - new Date(a.date as string).getTime());
+  const timelineEvents: TimelineEvent[] = [
+    ...panel.documents.map((d) => ({
+      id: `doc-${d.id}`, kind: "exam" as const, date: d.date,
+      title: `Exame recebido: ${d.title}`,
+      sub: d.lab ?? "Documento enviado pelo paciente",
+    })),
+    ...agentRuns.map((r) => ({
+      id: `ai-${r.id}`, kind: "ai" as const, date: r.completed_at ?? r.created_at,
+      title: `Análise de IA — ${agentLabel(r.agent_name)}`,
+      decision: DECISION_META[r.human_decision] ?? null,
+    })),
+    ...(carePlan ? [{
+      id: `plan-${carePlan.id}`, kind: "plan" as const, date: carePlan.updated_at,
+      title: "Plano de cuidado atualizado",
+      sub: carePlan.title ?? undefined,
+    }] : []),
+  ]
+    .filter((e) => Boolean(e.date))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const renderCard = (b: PanelBiomarker) => (
     <div key={b.id} className="relative">
@@ -161,27 +192,39 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
         {/* RESUMO */}
         {tab === "resumo" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-              <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <BarChart3 size={18} style={{ color: "#52B788" }} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Link href={`/doctor/patient/${id}?tab=exames`} className="group rounded-3xl p-5 transition-colors hover:bg-white/[0.04]" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex items-center justify-between">
+                  <BarChart3 size={18} style={{ color: "#52B788" }} />
+                  <ChevronRight size={15} style={{ color: "#5A5A50" }} className="group-hover:translate-x-1 transition-transform" />
+                </div>
                 <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{panel.biomarkers.length}</p>
                 <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Biomarcadores disponíveis</p>
-              </div>
-              <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <AlertTriangle size={18} style={{ color: "#F4A261" }} />
+              </Link>
+              <Link href={`/doctor/patient/${id}?tab=exames#fora-do-intervalo`} className="group rounded-3xl p-5 transition-colors hover:bg-white/[0.04]" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex items-center justify-between">
+                  <AlertTriangle size={18} style={{ color: "#F4A261" }} />
+                  <ChevronRight size={15} style={{ color: "#5A5A50" }} className="group-hover:translate-x-1 transition-transform" />
+                </div>
                 <p className="text-3xl font-bold mt-4" style={{ color: outOfRange.length > 0 ? "#F4A261" : "#E8E4D9" }}>{alteredCount}</p>
                 <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Fora da faixa/atenção</p>
-              </div>
-              <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <FileText size={18} style={{ color: "#52B788" }} />
+              </Link>
+              <Link href={`/doctor/patient/${id}?tab=documentos`} className="group rounded-3xl p-5 transition-colors hover:bg-white/[0.04]" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex items-center justify-between">
+                  <FileText size={18} style={{ color: "#52B788" }} />
+                  <ChevronRight size={15} style={{ color: "#5A5A50" }} className="group-hover:translate-x-1 transition-transform" />
+                </div>
                 <p className="text-3xl font-bold mt-4" style={{ color: "#E8E4D9" }}>{panel.documents.length}</p>
                 <p className="text-xs mt-1" style={{ color: "#9A9688" }}>Documentos recentes</p>
-              </div>
-              <div className="rounded-3xl p-5" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <ShieldCheck size={18} style={{ color: "#52B788" }} />
+              </Link>
+              <Link href={`/doctor/patient/${id}?tab=ia`} className="group rounded-3xl p-5 transition-colors hover:bg-white/[0.04]" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex items-center justify-between">
+                  <ShieldCheck size={18} style={{ color: "#52B788" }} />
+                  <ChevronRight size={15} style={{ color: "#5A5A50" }} className="group-hover:translate-x-1 transition-transform" />
+                </div>
                 <p className="text-3xl font-bold mt-4" style={{ color: pendingAgentRuns.length > 0 ? "#F4A261" : "#E8E4D9" }}>{pendingAgentRuns.length}</p>
                 <p className="text-xs mt-1" style={{ color: "#9A9688" }}>IA pendente de revisão</p>
-              </div>
+              </Link>
             </div>
 
             <section className="rounded-3xl p-5 lg:p-6" style={{ background: "rgba(244,162,97,0.06)", border: "1px solid rgba(244,162,97,0.18)" }}>
@@ -195,7 +238,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>Último documento</p>
-                  <p className="mt-1" style={{ color: "#E8E4D9" }}>{latestDocument ? `${latestDocument.title} · ${formatDate(latestDocument.date)}` : "Nenhum documento recente"}</p>
+                  <p className="mt-1 break-words" style={{ color: "#E8E4D9" }}>{latestDocument ? `${latestDocument.title} · ${formatDate(latestDocument.date)}` : "Nenhum documento recente"}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>IA revisável</p>
@@ -223,11 +266,11 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
         {tab === "exames" && (
           <div className="space-y-6">
             {outOfRange.length > 0 && (
-              <div>
+              <div id="fora-do-intervalo" className="scroll-mt-24">
                 <h2 className="text-sm font-semibold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: "#9A9688" }}>
                   <AlertTriangle size={14} style={{ color: "#C1440E" }} /> Fora do intervalo ({outOfRange.length})
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{outOfRange.map(renderCard)}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{outOfRange.map(renderCard)}</div>
               </div>
             )}
             {attention.length > 0 && (
@@ -235,7 +278,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
                 <h2 className="text-sm font-semibold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: "#9A9688" }}>
                   <FlaskConical size={14} style={{ color: "#F4A261" }} /> Atenção ({attention.length})
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{attention.map(renderCard)}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{attention.map(renderCard)}</div>
               </div>
             )}
             {normal.length > 0 && (
@@ -248,7 +291,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
                   return (
                     <div key={cat}>
                       <p className="text-xs uppercase tracking-wider mb-3" style={{ color: "#5A5A50" }}>{cat}</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{items.map(renderCard)}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{items.map(renderCard)}</div>
                     </div>
                   );
                 })}
@@ -261,28 +304,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
         )}
 
         {/* LINHA DO TEMPO */}
-        {tab === "timeline" && (
-          <div>
-            {timelineEvents.length === 0 ? (
-              <p className="text-sm" style={{ color: "#5A5A50" }}>Sem eventos clínicos registrados ainda.</p>
-            ) : (
-              <div className="space-y-3">
-                {timelineEvents.map((e, i) => (
-                  <div key={i} className="flex gap-3 p-4 rounded-2xl" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: e.kind === "ai" ? "rgba(244,162,97,0.1)" : "rgba(82,183,136,0.1)", border: `1px solid ${e.kind === "ai" ? "rgba(244,162,97,0.22)" : "rgba(82,183,136,0.2)"}` }}>
-                      {e.kind === "ai" ? <BrainCircuit size={15} style={{ color: "#F4A261" }} /> : <FlaskConical size={15} style={{ color: "#52B788" }} />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium" style={{ color: "#E8E4D9" }}>{e.title}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "#9A9688" }}>{e.sub}</p>
-                    </div>
-                    <p className="text-xs ml-auto whitespace-nowrap" style={{ color: "#5A5A50" }}>{formatDate(e.date)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {tab === "timeline" && <PatientTimeline events={timelineEvents} />}
 
         {/* IA */}
         {tab === "ia" && (
@@ -325,8 +347,8 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
               <div className="grid md:grid-cols-2 gap-3">
                 {panel.documents.map((d) => (
                   <div key={d.id} className="rounded-2xl p-4 space-y-1" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{d.title}</p>
-                    {d.lab && <p className="text-xs" style={{ color: "#5A5A50" }}>{d.lab}</p>}
+                    <p className="text-sm font-semibold break-words" style={{ color: "#E8E4D9" }}>{d.title}</p>
+                    {d.lab && <p className="text-xs break-words" style={{ color: "#5A5A50" }}>{d.lab}</p>}
                     <p className="text-xs" style={{ color: "#5A5A50" }}>{new Date(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</p>
                   </div>
                 ))}

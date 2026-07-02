@@ -104,11 +104,42 @@ export function getAgentReviewSummary(agentRun: AgentRunForReview) {
     null;
 
   if (typeof possibleSummary === "string") return possibleSummary;
+
+  // Análise metabólica: output no formato { patterns, notes, confidence } — não
+  // possui "summary". Monta um resumo a partir dos nomes dos padrões / notes.
+  if (Array.isArray(output.patterns) && output.patterns.length > 0) {
+    const names = output.patterns
+      .map((p) => (p && typeof p === "object" && "name" in p && typeof (p as Record<string, unknown>).name === "string" ? (p as Record<string, string>).name : null))
+      .filter((name): name is string => Boolean(name));
+    if (names.length > 0) {
+      const notes = typeof output.notes === "string" && output.notes.trim() ? ` ${output.notes.trim()}` : "";
+      return `${names.length} padrão(ões) metabólico(s) identificado(s): ${names.join(", ")}.${notes}`;
+    }
+  }
+  if (typeof output.notes === "string" && output.notes.trim()) return output.notes.trim();
+
   return "Análise disponível para revisão médica.";
 }
 
 export function getAgentReviewHighlights(agentRun: AgentRunForReview): string[] {
   const output = agentRun.edited_output ?? agentRun.output_json ?? {};
+
+  // Análise metabólica: cada padrão vira um destaque (nome — resumo).
+  if (Array.isArray(output.patterns) && output.patterns.length > 0) {
+    const lines = output.patterns
+      .map((pattern) => {
+        if (!pattern || typeof pattern !== "object") return null;
+        const obj = pattern as Record<string, unknown>;
+        const name = typeof obj.name === "string" ? obj.name : null;
+        const detail = typeof obj.summary === "string" ? obj.summary : typeof obj.description === "string" ? obj.description : null;
+        if (name && detail) return `${name} — ${detail}`;
+        return name ?? detail ?? null;
+      })
+      .filter((line): line is string => Boolean(line))
+      .slice(0, 6);
+    if (lines.length > 0) return lines;
+  }
+
   const candidates = [
     output.highlights,
     output.key_findings,

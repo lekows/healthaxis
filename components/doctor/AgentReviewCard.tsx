@@ -83,9 +83,14 @@ export function AgentReviewCard({ agentRun, patientId, summary, highlights }: Pr
               {decisionLabel(decision)}
             </span>
           </div>
-          <p className="text-xs mt-2" style={{ color: "#5A5A50" }}>
-            Modelo: {agentRun.model_used ?? "não informado"} · confiança: {agentRun.confidence_score ?? "-"}
-          </p>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="text-xs" style={{ color: "#5A5A50" }}>Gerado por IA</span>
+            {agentRun.confidence_score != null && (
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(82,183,136,0.1)", color: "#52B788" }}>
+                {Math.round(agentRun.confidence_score * 100)}% de confiança
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
