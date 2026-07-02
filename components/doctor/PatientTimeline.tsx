@@ -56,7 +56,7 @@ export function PatientTimeline({ events }: { events: TimelineEvent[] }) {
               </div>
               <div className="flex-1 min-w-0 rounded-2xl p-4" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <p className="text-sm font-medium min-w-0" style={{ color: "#E8E4D9" }}>{e.title}</p>
+                  <p className="text-sm font-medium min-w-0 break-words" style={{ color: "#E8E4D9" }}>{e.title}</p>
                   <p className="text-xs whitespace-nowrap" style={{ color: "#5A5A50" }}>{formatFullDate(e.date)}</p>
                 </div>
                 {e.sub && <p className="text-xs mt-1" style={{ color: "#9A9688" }}>{e.sub}</p>}

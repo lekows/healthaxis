@@ -191,7 +191,7 @@ export function DashboardLayout({ children, userName, isDoctor = false, isClinic
       </motion.aside>
 
       {/* Main */}
-      <div className="flex-1 lg:pl-64">
+      <div className="flex-1 lg:pl-64 min-w-0">
         {/* Mobile header */}
         <motion.header
           className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-3"

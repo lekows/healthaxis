@@ -238,7 +238,7 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>Último documento</p>
-                  <p className="mt-1" style={{ color: "#E8E4D9" }}>{latestDocument ? `${latestDocument.title} · ${formatDate(latestDocument.date)}` : "Nenhum documento recente"}</p>
+                  <p className="mt-1 break-words" style={{ color: "#E8E4D9" }}>{latestDocument ? `${latestDocument.title} · ${formatDate(latestDocument.date)}` : "Nenhum documento recente"}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-wider" style={{ color: "#5A5A50" }}>IA revisável</p>
@@ -347,8 +347,8 @@ export default async function DoctorPatientPage({ params, searchParams }: Props)
               <div className="grid md:grid-cols-2 gap-3">
                 {panel.documents.map((d) => (
                   <div key={d.id} className="rounded-2xl p-4 space-y-1" style={{ background: "#141412", border: "1px solid rgba(255,255,255,0.07)" }}>
-                    <p className="text-sm font-semibold" style={{ color: "#E8E4D9" }}>{d.title}</p>
-                    {d.lab && <p className="text-xs" style={{ color: "#5A5A50" }}>{d.lab}</p>}
+                    <p className="text-sm font-semibold break-words" style={{ color: "#E8E4D9" }}>{d.title}</p>
+                    {d.lab && <p className="text-xs break-words" style={{ color: "#5A5A50" }}>{d.lab}</p>}
                     <p className="text-xs" style={{ color: "#5A5A50" }}>{new Date(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</p>
                   </div>
                 ))}
